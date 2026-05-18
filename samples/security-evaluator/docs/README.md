@@ -4,41 +4,44 @@ Choose your learning path:
 
 - **New here?** Start with [START_HERE.md](../START_HERE.md) for a simple-to-advanced step-by-step flow.
 
-## ?? Quick Start (5 minutes)
+## Quick Start (5 minutes)
 
 New to this package? Start here:
-- [Start Here](../START_HERE.md) � Step-by-step path from first run to advanced modes
-- [Script Quickstart](script/quickstart.md) � Run your first red-team scenario
-- [PyRIT Local Setup](./setup/local_setup.md) � Install PyRIT and dependencies
+- [Start Here](../START_HERE.md) — Step-by-step path from first run to advanced modes
+- [Security Evaluator User Guide](./SECURITY_EVALUATOR_USER_GUIDE.md) — full sample walkthrough from install through GUI and report analysis
+- [Script Quickstart](script/quickstart.md) — run your first red-team scenario
+- [PyRIT Local Setup](./setup/local_setup.md) — install PyRIT and dependencies
 
-## ?? PyRIT Platform Documentation
+## PyRIT Platform Documentation
 
 Learn how to install, configure, and use PyRIT:
 
-- **[Security Evaluator User Guide](./SECURITY_EVALUATOR_USER_GUIDE.md)** � central walkthrough for setup, configuration, reports, and attack modes
-- **[Local Installation](./setup/local_setup.md)** � Install PyRIT locally on Linux, macOS, or Windows
-- **[Docker Setup](./setup/docker_setup.md)** � Run PyRIT in containers with host Ollama
-- **[GUI Tutorial](./setup/gui_setup.md)** � Set up and use the PyRIT graphical interface for analysis
-- **[GUI report transfer](./setup/gui_data_transfer.md)** � export/import JSON reports between run hosts and GUI hosts
-- **[Configuration field reference](./script/configuration_fields.md)** � explicit `.env` and `.pyrit_config` field definitions
-- **[Report analysis](./script/report_analysis.md)** � how to interpret generated output files and logs
+- **[Security Evaluator User Guide](./SECURITY_EVALUATOR_USER_GUIDE.md)** - central walkthrough for setup, configuration, reports, and attack modes
+- **[Local Installation](./setup/local_setup.md)** - Install PyRIT locally on Linux, macOS, or Windows
+- **[Docker Setup](./setup/docker_setup.md)** - Run PyRIT in containers with host Ollama
+- **[GUI Tutorial](./setup/gui_setup.md)** - Set up and use the PyRIT graphical interface for analysis
+- **[GUI report transfer](./setup/gui_data_transfer.md)** - export/import JSON reports between run hosts and GUI hosts
+- **[Configuration field reference](./script/configuration_fields.md)** - explicit `.env` and `.pyrit_config` field definitions
+- **[Report analysis](./script/report_analysis.md)** - how to interpret generated output files and logs
 
-?? **New to PyRIT?** Start with [PyRIT Installation Guide](./setup/README.md)
+### New to PyRIT?
+Start with [PyRIT Installation Guide](./setup/README.md)
 
-## ?? Red-Team Script Documentation
+## Red-Team Script Documentation
 
 Everything about `scripts/app/main.py`:
 
-- **[Script Overview](script/README.md)** � Architecture, features, and output structure
-- **[Quickstart](script/quickstart.md)** � Get running in 5 minutes
-- **[Usage Guide](script/usage_guide.md)** � All configuration options and environment variables
-- **[Technical Reference](script/technical_reference.md)** � Script internals, components, and extension points
-- **[Custom Datasets](script/custom_dataset_guide.md)** � Author and validate custom attack datasets
-- **[Artifacts and Outputs](script/artifacts.md)** � What files are generated and how to use them
+- **[Script Overview](script/README.md)** - Architecture, features, and output structure
+- **[Quickstart](script/quickstart.md)** - Get running in 5 minutes
+- **[Usage Guide](script/usage_guide.md)** - All configuration options and environment variables
+- **[Technical Reference](script/technical_reference.md)** - Script internals, components, and extension points
+- **[Custom Datasets](script/custom_dataset_guide.md)** - Author and validate custom attack datasets
+- **[Artifacts and Outputs](script/artifacts.md)** - What files are generated and how to use them
 
-?? **First time?** Start with [Script Quickstart](script/quickstart.md)
+### First time?
+Start with [Script Quickstart](script/quickstart.md)
 
-## ?? Common Workflows
+## Common Workflows
 
 **I want to run a red-team attack:**
 1. [PyRIT Local Setup](./setup/local_setup.md)
@@ -52,7 +55,7 @@ Everything about `scripts/app/main.py`:
 4. Review generated files in [Artifacts and Outputs](script/artifacts.md)
 
 **I want to use custom attack prompts:**
-1. Author dataset ? see [Custom Datasets](script/custom_dataset_guide.md)
+1. Author dataset — see [Custom Datasets](script/custom_dataset_guide.md)
 2. Validate with `custom_dataset_validator.py`
 3. Configure script to use it
 4. Run and review results
@@ -61,7 +64,7 @@ Everything about `scripts/app/main.py`:
 1. [Docker Setup](./setup/docker_setup.md)
 2. [Script Quickstart](script/quickstart.md) (from within container)
 
-## ?? Runbook Essentials
+## Runbook Essentials
 
 Use this minimal operational flow for repeatable runs:
 
@@ -94,7 +97,7 @@ docs/
     custom_dataset_guide.md ? Dataset creation and validation
 ```
 
-## ?? Troubleshooting
+## Troubleshooting
 
 **Can't reach Ollama?**
 - See [Docker Setup / Troubleshooting](./setup/docker_setup.md#troubleshooting) (applies to local too)

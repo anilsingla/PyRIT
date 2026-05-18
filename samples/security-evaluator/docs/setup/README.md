@@ -6,6 +6,7 @@ Select your preferred setup method:
 - **[Docker Setup](docker_setup.md)**  - Run PyRIT in containers with host Ollama integration.
 - **[GUI Tutorial](gui_setup.md)**  - Set up and run the PyRIT GUI for analysis and scoring.
 - **[GUI report transfer](gui_data_transfer.md)** - Move generated JSON reports between run hosts and GUI hosts.
+- **[Security Evaluator User Guide](../SECURITY_EVALUATOR_USER_GUIDE.md)** - full sample walkthrough from install through GUI and report analysis.
 
 ## Quick start (new users)
 

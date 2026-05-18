@@ -2,6 +2,8 @@
 
 This is the main entry guide for this sample.
 
+For a complete, sequential walkthrough from install through GUI and report analysis, also see [Security Evaluator User Guide](docs/SECURITY_EVALUATOR_USER_GUIDE.md).
+
 Use this file when you want to go from **first run** to **advanced red-team workflows** in a safe order.
 
 ## What this sample does

@@ -4,6 +4,8 @@ This folder contains the complete red-team execution environment organized by wo
 
 New to this sample? Start with [START_HERE.md](../START_HERE.md) for a simple step-by-step path from first run to advanced modes.
 
+For a complete, sequential security evaluator walkthrough, see [../docs/SECURITY_EVALUATOR_USER_GUIDE.md](../docs/SECURITY_EVALUATOR_USER_GUIDE.md).
+
 ## API and Service Hosting
 
 This sample now includes optional API and service files outside `scripts/`:

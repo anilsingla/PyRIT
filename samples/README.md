@@ -13,3 +13,4 @@ This directory is organized by sample workflow.
 - Setup docs: `security-evaluator/docs/setup/`
 - Script docs: `security-evaluator/docs/script/`
 - Documentation hub: `security-evaluator/docs/README.md`
+- Security Evaluator user guide: `security-evaluator/docs/SECURITY_EVALUATOR_USER_GUIDE.md`

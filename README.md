@@ -40,6 +40,8 @@ on how to [install PyRIT](https://github.com/Azure/PyRIT/blob/main/doc/setup/ins
 our [How to Guide](https://github.com/Azure/PyRIT/blob/main/doc/how_to_guide.ipynb),
 and more, as well as our [demos](https://github.com/Azure/PyRIT/tree/main/doc/demo) folder.
 
+For the security evaluator sample, use the dedicated user guide at [samples/security-evaluator/docs/SECURITY_EVALUATOR_USER_GUIDE.md](samples/security-evaluator/docs/SECURITY_EVALUATOR_USER_GUIDE.md) for a full, sequential walkthrough.
+
 ## Trademarks
 
 This project may contain trademarks or logos for projects, products, or services.
