@@ -60,8 +60,11 @@ curl http://localhost:8088/health
 ## 2) Common runtime environment variables
 
 Service wrappers should pass these variables:
-- `API_HOST` (default `0.0.0.0`)
+- `API_HOST` (default `127.0.0.1`)
 - `API_PORT` (default `8088`)
+- `API_ALLOW_REMOTE_HOST` (`false` by default; set `true` only when intentionally exposing API remotely)
+- `API_AUTH_ENABLED` (`false` by default; set `true` to require bearer token auth for `/api/v1/*`)
+- `API_BEARER_TOKEN` (required only when `API_AUTH_ENABLED=true`)
 - `API_RELOAD` (`false` for services)
 - `API_SSL_CERTFILE` (optional)
 - `API_SSL_KEYFILE` (optional)
@@ -185,7 +188,7 @@ Optional parameters:
 After install, set environment via NSSM:
 
 ```powershell
-nssm set PyRITRedTeamAPI AppEnvironmentExtra "API_HOST=0.0.0.0`nAPI_PORT=8088`nAPI_RELOAD=false`nAPI_SSL_CERTFILE=C:\certs\cert.pem`nAPI_SSL_KEYFILE=C:\certs\key.pem"
+nssm set PyRITRedTeamAPI AppEnvironmentExtra "API_HOST=127.0.0.1`nAPI_PORT=8088`nAPI_ALLOW_REMOTE_HOST=false`nAPI_AUTH_ENABLED=true`nAPI_BEARER_TOKEN=replace-with-strong-random-value`nAPI_RELOAD=false`nAPI_SSL_CERTFILE=C:\certs\cert.pem`nAPI_SSL_KEYFILE=C:\certs\key.pem"
 Restart-Service PyRITRedTeamAPI
 ```
 

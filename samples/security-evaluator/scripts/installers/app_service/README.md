@@ -2,12 +2,12 @@
 
 This folder contains optional service wrappers for hosting the security-evaluator API in the background.
 
-New to this sample? Start with [START_HERE.md](../../../../START_HERE.md) for a simple step-by-step path from first run to advanced modes.
+New to this sample? Start with [START_HERE.md](../../../START_HERE.md) for a simple step-by-step path from first run to advanced modes.
 
 ## Full services guide (single file for all environments)
 
 - See [SERVICES_GUIDE.md](SERVICES_GUIDE.md) for Windows, Linux, and macOS step-by-step service setup and operations.
-- For a guided dependency, config, and service-wrapper setup flow, use [../install_security-evaluator.py](../install_security-evaluator.py).
+- For a guided dependency, config, and service-wrapper setup flow, use [../install_security_evaluator.py](../install_security_evaluator.py).
 
 ## Linux (systemd)
 

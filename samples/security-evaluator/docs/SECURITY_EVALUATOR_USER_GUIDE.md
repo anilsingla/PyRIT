@@ -24,6 +24,8 @@ It collects the critical user-facing documentation for setup, configuration, att
 
 Use these documents together to understand the sample and the PyRIT platform.
 
+- [About PyRIT](../../../doc/about_pyrit.md) — core PyRIT purpose, architecture context, and design intent.
+- [PyRIT glossary](../../../doc/glossary.md) — definitions of PyRIT concepts and terminology.
 - [Start Here](../START_HERE.md) — step-by-step sample flow from first run to advanced attacks.
 - [Local installation](./setup/local_setup.md) — install dependencies on Windows, Linux, or macOS.
 - [Docker setup](./setup/docker_setup.md) — run PyRIT inside Docker with host Ollama support.
@@ -214,59 +216,140 @@ For how to analyze the reports, see:
 
 ## 7. Advanced tests and attack types
 
-### Attack mode commands
+### Complete CLI parameter reference
 
-- Default red-team:
+The application accepts these top-level values and flags:
+
+- `--attack-mode`: `redteam`, `tap`, `crescendo`, `xpia`, `baseline`, `rescore`, `report`
+- `--turn-mode`: `single`, `multi` (multi is valid only for `redteam`, `tap`, `crescendo`)
+- `--converters`: comma-separated or space-separated converter keys
+  - Available keys: `base64`, `rot13`, `caesar`, `atbash`, `flip`, `leetspeak`, `unicode_confusable`, `string_join`, `char_swap`, `emoji`, `random_caps`, `tone_persuasive`, `variation`, `translation_french`
+- `--all-converters`: run all converter keys
+- `--datasets`: dataset names and/or custom dataset file paths (`.json`, `.yaml`, `.yml`, `.prompt`)
+- `--all-datasets`: run all available datasets
+- `--scorers`: comma-separated or space-separated scorer keys
+  - Available keys: `substring`, `self_ask_true_false`, `self_ask_scale`, `scale_threshold_0_7`, `refusal`, `compliance_inverted_refusal`
+- `--all-scorers`: run all available scorers
+- `--scenarios`: OWASP IDs such as `LLM01 ... LLM10`
+- `--dry-run`: plan only, no attack execution
+- `--local-datasets-only`: skip remote dataset provider fetch
+- `--converter-info`: print converter guide and exit
+- `--detailed-help`: print comprehensive help and exit
+
+Mode-specific parameters:
+
+- TAP (`--attack-mode tap`)
+  - `--tap-width <int>`
+  - `--tap-depth <int>`
+  - `--tap-branching-factor <int>`
+- Crescendo (`--attack-mode crescendo`)
+  - `--max-backtracks <int>`
+  - `--max-turns <int>`
+- Baseline (`--attack-mode baseline`)
+  - `--max-seeds <int>` (`0` means unlimited)
+- Rescore (`--attack-mode rescore`)
+  - `--filter-owasp <LLM IDs...>`
+  - `--output-json <path>`
+- Report (`--attack-mode report`)
+  - `--output-html <path>`
+  - `--output-md <path>`
+  - `--output-json <path>`
+  - `--open`
+
+### Single-turn and multi-turn behavior by mode
+
+- Multi-turn supported: `redteam`, `tap`, `crescendo`
+- Single-turn only: `baseline`, `xpia`
+- Turn mode not applicable: `rescore`, `report`
+
+If `--turn-mode multi` is used with `baseline` or `xpia`, the runner returns a validation error.
+
+### Per-mode command examples
+
+#### 1) Redteam mode
+
+Single-turn example:
 
 ```bash
-python scripts/app/main.py --attack-mode redteam
+python scripts/app/main.py --attack-mode redteam --turn-mode single --scenarios LLM01 --converters base64,leetspeak --datasets harmbench --scorers self_ask_true_false --dry-run
 ```
 
-- TAP mode:
+Multi-turn example:
 
 ```bash
-python scripts/app/main.py --attack-mode tap --scenarios LLM01 --tap-width 5
+python scripts/app/main.py --attack-mode redteam --turn-mode multi --all-converters --all-datasets --all-scorers
 ```
 
-- Crescendo mode:
+#### 2) TAP mode
+
+Single-turn example (forces depth to one turn behavior):
 
 ```bash
-python scripts/app/main.py --attack-mode crescendo --scenarios LLM06 --max-turns 10
+python scripts/app/main.py --attack-mode tap --turn-mode single --scenarios LLM01 --tap-width 3 --tap-depth 5 --tap-branching-factor 2 --dry-run
 ```
 
-- XPIA mode:
+Multi-turn example:
 
 ```bash
-python scripts/app/main.py --attack-mode xpia
+python scripts/app/main.py --attack-mode tap --turn-mode multi --scenarios LLM01 LLM02 --tap-width 5 --tap-depth 4 --tap-branching-factor 2
 ```
 
-- Baseline mode:
+#### 3) Crescendo mode
+
+Single-turn example:
 
 ```bash
-python scripts/app/main.py --attack-mode baseline --max-seeds 5
+python scripts/app/main.py --attack-mode crescendo --turn-mode single --scenarios LLM06 --max-backtracks 5 --max-turns 10 --dry-run
 ```
 
-- Rescore mode:
+Multi-turn example:
 
 ```bash
-python scripts/app/main.py --attack-mode rescore --scorers self_ask_true_false
+python scripts/app/main.py --attack-mode crescendo --turn-mode multi --scenarios LLM06 LLM08 --max-backtracks 6 --max-turns 12
 ```
 
-- Report generation:
+#### 4) XPIA mode
+
+XPIA supports single-turn behavior.
+
+Single-turn example:
 
 ```bash
-python scripts/app/main.py --attack-mode report --open
+python scripts/app/main.py --attack-mode xpia --scenarios LLM02 LLM08 --dry-run
 ```
 
-### Single-turn vs multi-turn
+Multi-turn note: not supported for XPIA.
 
-- `--turn-mode single` forces one-turn conversations in redteam, TAP, or Crescendo.
-- `--turn-mode multi` enables multi-turn behavior where supported.
+#### 5) Baseline mode
+
+Baseline is single-turn control scanning.
+
+Single-turn example:
+
+```bash
+python scripts/app/main.py --attack-mode baseline --scenarios LLM01 LLM03 --datasets harmbench --scorers self_ask_true_false --max-seeds 5
+```
+
+Multi-turn note: not supported for baseline.
+
+#### 6) Rescore mode
+
+Rescore recomputes scores from existing memory records.
 
 Example:
 
 ```bash
-python scripts/app/main.py --attack-mode redteam --turn-mode single
+python scripts/app/main.py --attack-mode rescore --scorers self_ask_true_false,refusal --filter-owasp LLM01 LLM02 --output-json reports/rescore_report_custom.json
+```
+
+#### 7) Report mode
+
+Report mode renders outputs from existing artifacts.
+
+Example:
+
+```bash
+python scripts/app/main.py --attack-mode report --output-html reports/run_report.html --output-md reports/run_report.md --output-json reports/report_summary.json --open
 ```
 
 ### Expected reports
@@ -444,6 +527,48 @@ Primary documentation sources:
 
 For sample-specific run details, use the guide links above and the central
 [Security Evaluator User Guide](./SECURITY_EVALUATOR_USER_GUIDE.md).
+
+### Optional API auth quickstart (disabled by default)
+
+Use this only when you explicitly want API endpoint protection.
+
+1. Keep local bind unless remote exposure is required:
+
+```bash
+export API_HOST=127.0.0.1
+export API_ALLOW_REMOTE_HOST=false
+```
+
+2. Enable auth and define bearer token:
+
+```bash
+export API_AUTH_ENABLED=true
+export API_BEARER_TOKEN=replace-with-strong-random-value
+```
+
+3. Start API service:
+
+```bash
+cd samples/security-evaluator
+python -m api.run_api
+```
+
+4. Call protected endpoint:
+
+```bash
+curl -H "Authorization: Bearer replace-with-strong-random-value" \
+  http://127.0.0.1:8088/api/v1/options
+```
+
+PowerShell equivalent:
+
+```powershell
+$env:API_HOST = "127.0.0.1"
+$env:API_ALLOW_REMOTE_HOST = "false"
+$env:API_AUTH_ENABLED = "true"
+$env:API_BEARER_TOKEN = "replace-with-strong-random-value"
+python -m api.run_api
+```
 
 ---
 

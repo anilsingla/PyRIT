@@ -20,7 +20,7 @@ See:
 - [Services quick reference](installers/app_service/README.md)
 - [Services all-environments guide](installers/app_service/SERVICES_GUIDE.md)
 - [Artifacts and outputs](../docs/script/artifacts.md)
-- [Interactive installer](installers/install_security-evaluator.py) - Guided setup for dependencies and config files
+- [Interactive installer](installers/install_security_evaluator.py) - Guided setup for dependencies and config files
 
 ## Folder Structure
 

@@ -127,7 +127,7 @@ python -m api.run_api
 ```
 
 Default bind:
-- Host: `0.0.0.0`
+- Host: `127.0.0.1`
 - Port: `8088`
 
 Swagger/OpenAPI docs:
@@ -137,8 +137,11 @@ Swagger/OpenAPI docs:
 ## 6) API environment variables
 
 Runtime vars read by `api/run_api.py`:
-- `API_HOST` (default: `0.0.0.0`)
+- `API_HOST` (default: `127.0.0.1`)
 - `API_PORT` (default: `8088`)
+- `API_ALLOW_REMOTE_HOST` (default: `false`; required for non-local host binding)
+- `API_AUTH_ENABLED` (default: `false`; when `true`, protect `/api/v1/*` with bearer auth)
+- `API_BEARER_TOKEN` (required only when `API_AUTH_ENABLED=true`)
 - `API_RELOAD` (default: `false`)
 - `API_SSL_CERTFILE` (optional; enables HTTPS when set)
 - `API_SSL_KEYFILE` (optional; enables HTTPS when set)
@@ -156,6 +159,13 @@ Example (bash/zsh):
 export API_HOST=127.0.0.1
 export API_PORT=8088
 export API_RELOAD=true
+python -m api.run_api
+```
+
+Optional auth enable example:
+```bash
+export API_AUTH_ENABLED=true
+export API_BEARER_TOKEN=replace-with-strong-random-value
 python -m api.run_api
 ```
 
@@ -223,3 +233,9 @@ curl "http://localhost:8088/api/v1/runs/<job_id>/output?tail_lines=200"
 - API quick reference: `api/README.md`
 - Example clients: `api/examples/README.md`
 - Service hosting: `scripts/installers/app_service/SERVICES_GUIDE.md`
+
+## Security notes
+
+- The API exposes run status and run output endpoints and does not provide built-in authentication.
+- Keep default localhost binding unless remote access is explicitly required.
+- If remote exposure is required, set `API_ALLOW_REMOTE_HOST=true` intentionally and place the API behind TLS plus an authenticated gateway/reverse proxy.

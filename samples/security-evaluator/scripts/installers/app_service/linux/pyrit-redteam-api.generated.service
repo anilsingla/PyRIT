@@ -5,7 +5,7 @@ After=network.target
 [Service]
 Type=simple
 WorkingDirectory=/opt/PyRIT/samples/security-evaluator
-Environment=API_HOST=0.0.0.0
+Environment=API_HOST=127.0.0.1
 Environment=API_PORT=8088
 Environment=API_RELOAD=false
 ExecStart=/usr/bin/python3 -m api.run_api

@@ -66,7 +66,7 @@ def generate_macos_plist(
 
 def setup_api_service(*, platform_name: str, install_service: bool, python_exe: str) -> None:
     """Generate service wrappers and optionally install/start service."""
-    host = prompt(message="API service host", default="0.0.0.0")
+    host = prompt(message="API service host", default="127.0.0.1")
     port = prompt_int(message="API service port", default=8088, min_value=1, max_value=65535)
     service_working_dir, service_python_exe = prompt_service_paths(
         platform_name=platform_name,

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import os
+import secrets
 import subprocess
 import sys
 import threading
@@ -11,7 +13,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Literal
 
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import Depends, FastAPI, Header, HTTPException, Query
 
 from .models import (
     CancelResponse,
@@ -26,6 +28,39 @@ from .models import (
 
 
 RunJobStatus = Literal["queued", "running", "completed", "failed", "cancelled"]
+
+
+def _as_bool(*, value: str | None, default: bool = False) -> bool:
+    if value is None:
+        return default
+    return value.strip().lower() in {"1", "true", "yes", "y", "on"}
+
+
+def _require_api_auth(*, authorization: str | None = Header(default=None)) -> None:
+    """Optionally enforce bearer authentication for API endpoints.
+
+    Controlled by env vars:
+    - API_AUTH_ENABLED: false by default.
+    - API_BEARER_TOKEN: required only when API_AUTH_ENABLED is true.
+    """
+
+    auth_enabled = _as_bool(value=os.getenv("API_AUTH_ENABLED"), default=False)
+    if not auth_enabled:
+        return
+
+    configured_token = os.getenv("API_BEARER_TOKEN", "")
+    if not configured_token:
+        raise HTTPException(status_code=500, detail="API auth enabled but API_BEARER_TOKEN is not configured")
+
+    if not authorization:
+        raise HTTPException(status_code=401, detail="Missing Authorization header")
+
+    scheme, _, supplied_token = authorization.partition(" ")
+    if scheme.lower() != "bearer" or not supplied_token:
+        raise HTTPException(status_code=401, detail="Authorization header must use Bearer token")
+
+    if not secrets.compare_digest(supplied_token, configured_token):
+        raise HTTPException(status_code=401, detail="Invalid bearer token")
 
 
 @dataclass
@@ -333,7 +368,7 @@ async def health_check_async() -> HealthResponse:
     return HealthResponse()
 
 
-@app.get("/api/v1/options", response_model=OptionCatalogResponse)
+@app.get("/api/v1/options", response_model=OptionCatalogResponse, dependencies=[Depends(_require_api_auth)])
 async def list_options_async() -> OptionCatalogResponse:
     """Return supported utility options.
 
@@ -349,7 +384,7 @@ async def list_options_async() -> OptionCatalogResponse:
     )
 
 
-@app.post("/api/v1/runs", response_model=RunStartResponse)
+@app.post("/api/v1/runs", response_model=RunStartResponse, dependencies=[Depends(_require_api_auth)])
 async def start_run_async(payload: RunStartRequest) -> RunStartResponse:
     """Start a background run.
 
@@ -364,7 +399,7 @@ async def start_run_async(payload: RunStartRequest) -> RunStartResponse:
     return RunStartResponse(job_id=job.job_id, status=job.status, output_file=str(job.output_file))
 
 
-@app.post("/api/v1/runs/dry-run", response_model=RunStartResponse)
+@app.post("/api/v1/runs/dry-run", response_model=RunStartResponse, dependencies=[Depends(_require_api_auth)])
 async def start_dry_run_async(payload: RunStartRequest) -> RunStartResponse:
     """Start a dry-run command in background.
 
@@ -380,7 +415,7 @@ async def start_dry_run_async(payload: RunStartRequest) -> RunStartResponse:
     return RunStartResponse(job_id=job.job_id, status=job.status, output_file=str(job.output_file))
 
 
-@app.get("/api/v1/runs", response_model=list[RunStatusResponse])
+@app.get("/api/v1/runs", response_model=list[RunStatusResponse], dependencies=[Depends(_require_api_auth)])
 async def list_runs_async() -> list[RunStatusResponse]:
     """List known run jobs.
 
@@ -404,7 +439,7 @@ async def list_runs_async() -> list[RunStatusResponse]:
     ]
 
 
-@app.get("/api/v1/runs/{job_id}", response_model=RunStatusResponse)
+@app.get("/api/v1/runs/{job_id}", response_model=RunStatusResponse, dependencies=[Depends(_require_api_auth)])
 async def get_run_status_async(job_id: str) -> RunStatusResponse:
     """Get one run status by job ID.
 
@@ -435,7 +470,7 @@ async def get_run_status_async(job_id: str) -> RunStatusResponse:
     )
 
 
-@app.get("/api/v1/runs/{job_id}/output", response_model=RunOutputResponse)
+@app.get("/api/v1/runs/{job_id}/output", response_model=RunOutputResponse, dependencies=[Depends(_require_api_auth)])
 async def get_run_output_async(
     job_id: str,
     *,
@@ -462,7 +497,7 @@ async def get_run_output_async(
     return RunOutputResponse(job_id=job_id, tail_lines=tail_lines, output=output)
 
 
-@app.post("/api/v1/runs/{job_id}/cancel", response_model=CancelResponse)
+@app.post("/api/v1/runs/{job_id}/cancel", response_model=CancelResponse, dependencies=[Depends(_require_api_auth)])
 async def cancel_run_async(job_id: str) -> CancelResponse:
     """Cancel a running job.
 

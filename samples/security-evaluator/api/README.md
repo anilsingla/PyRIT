@@ -7,7 +7,7 @@ New to this sample? Start with [START_HERE.md](../START_HERE.md) for a simple st
 ## Full setup guide
 
 - See [API_SETUP_GUIDE.md](API_SETUP_GUIDE.md) for dependencies, installation, requirements, and step-by-step setup.
-- For a guided install that also writes sample config files, use [../scripts/installers/install_security-evaluator.py](../scripts/installers/install_security-evaluator.py).
+- For a guided install that also writes sample config files, use [../scripts/installers/install_security_evaluator.py](../scripts/installers/install_security_evaluator.py).
 
 ## Endpoints
 
@@ -29,8 +29,16 @@ python -m api.run_api
 ```
 
 Default bind:
-- Host: `0.0.0.0`
+- Host: `127.0.0.1`
 - Port: `8088`
+
+To intentionally expose the API on a network interface, set:
+- `API_HOST=0.0.0.0` (or another non-local host)
+- `API_ALLOW_REMOTE_HOST=true`
+
+Optional endpoint auth (disabled by default):
+- `API_AUTH_ENABLED=false` (default)
+- `API_BEARER_TOKEN=<token>` (required only when `API_AUTH_ENABLED=true`)
 
 ## Start API (HTTPS)
 
@@ -43,6 +51,23 @@ Then run:
 
 ```bash
 python -m api.run_api
+```
+
+## Optional bearer auth (explicit enable)
+
+The API auth control is optional and disabled by default.
+
+When enabled, all `/api/v1/*` endpoints require `Authorization: Bearer <token>`.
+
+Example:
+
+- `API_AUTH_ENABLED=true`
+- `API_BEARER_TOKEN=replace-with-strong-random-value`
+
+Request example:
+
+```bash
+curl -H "Authorization: Bearer replace-with-strong-random-value" http://localhost:8088/api/v1/options
 ```
 
 ## Example: start a dry run
@@ -65,6 +90,7 @@ curl -X POST http://localhost:8088/api/v1/runs/dry-run \
 
 - Each run writes output to `reports/api_runs/<job_id>.log`.
 - Jobs are in-memory; API restart clears active history, while output files remain.
+- The API does not include built-in authentication. Keep it bound to localhost, or place it behind an authenticated reverse proxy before remote exposure.
 
 ## Example clients
 

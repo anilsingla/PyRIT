@@ -4,7 +4,7 @@ param(
     [string]$Description = "Runs the security-evaluator API service",
     [string]$PythonExe = "python",
     [string]$WorkingDirectory = "C:\githubrepos\PyRIT\samples\security-evaluator",
-    [string]$Host = "0.0.0.0",
+    [string]$Host = "127.0.0.1",
     [int]$Port = 8088,
     [string]$NssmPath = "nssm"
 )

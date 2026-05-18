@@ -18,7 +18,7 @@
     <key>EnvironmentVariables</key>
     <dict>
       <key>API_HOST</key>
-      <string>0.0.0.0</string>
+      <string>127.0.0.1</string>
       <key>API_PORT</key>
       <string>8088</string>
       <key>API_RELOAD</key>
