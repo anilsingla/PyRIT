@@ -69,6 +69,33 @@ Windows PowerShell:
 .\scripts\installers\install_ollama_windows.ps1
 ```
 
+### Ollama install + setup (install, start, pull, test)
+
+Linux/macOS:
+
+```bash
+bash scripts/installers/setup_ollama_linux.sh
+```
+
+Windows PowerShell:
+
+```powershell
+.\scripts\installers\setup_ollama_windows.ps1
+```
+
+Useful environment variables for setup scripts:
+- `OLLAMA_MODELS` (default: `llama3.2 mistral phi3`)
+- `SKIP_PULL` (`true`/`false`)
+- `START_OLLAMA` (`true`/`false`)
+- `TEST_MODEL` (model for non-interactive test)
+- `OLLAMA_ENDPOINT` (default: `http://localhost:11434`)
+
+Windows-only:
+- `ENABLE_STARTUP_TASK=true` creates a startup task for `ollama serve`
+
+Linux-only:
+- `ENABLE_SYSTEMD_SERVICE=true` attempts `systemctl enable --now ollama`
+
 ### Component install actions via Python CLI
 
 You can also run specific installer actions with:
@@ -121,6 +148,206 @@ python scripts/helper/verification/validate_redteam_config.py
 **Port conflicts**
 - Issue: `Address already in use` when starting API or Ollama
 - Solution: Change port in `.env.local` (e.g., `OLLAMA_PORT=11435`) or stop conflicting service
+
+---
+
+## SQLite Database: Architecture & Volume Mounting
+
+This section explains where SQLite is physically stored and how Docker containers access the shared database file.
+
+### WHERE SQLITE IS INSTALLED AND STORED
+
+#### SQLite Binary (executable)
+
+The SQLite command-line tool is installed on your **host machine** operating system:
+
+**Linux/Ubuntu:**
+- Installation command: `apt-get install sqlite3`
+- Location: `/usr/bin/sqlite3`
+
+**macOS:**
+- Built-in: `/usr/bin/sqlite3` (system version)
+- Or Homebrew: `brew install sqlite3` → `/usr/local/bin/sqlite3`
+
+**Windows:**
+- Installation command: `winget install SQLite.SQLite` or `choco install sqlite`
+- Typical location: `C:\Program Files\sqlite\sqlite3.exe` or `C:\ProgramData\chocolatey\lib\sqlite\`
+
+#### SQLite Database File (data)
+
+The **database file** (`.db`) is stored on the **host machine** filesystem:
+
+```
+HOST MACHINE DISK
+└── <YOUR_REPO_ROOT>/
+    └── samples/security-evaluator/
+        └── reports/
+            └── pyrit_ollama_demo.db  ← PHYSICAL DATABASE FILE (HOST STORAGE)
+```
+
+**Example paths:**
+
+Linux/macOS:
+```
+/home/user/PyRIT/samples/security-evaluator/reports/pyrit_ollama_demo.db
+/Users/user/PyRIT/samples/security-evaluator/reports/pyrit_ollama_demo.db
+```
+
+Windows:
+```
+C:\Users\user\Documents\PyRIT\samples\security-evaluator\reports\pyrit_ollama_demo.db
+```
+
+### HOW CONTAINERS ACCESS THE DATABASE
+
+When you run Docker containers with `docker-compose.yaml`, they do **not** have their own copies of the database. Instead, they access the **same host file** through **volume mounting**:
+
+```
+docker-compose.yaml:
+┌─────────────────────────────────────────────────────────────────┐
+│ services:                                                       │
+│   copyrit:                                                      │
+│     volumes:                                                    │
+│       - ../../:/workspace  ← VOLUME MOUNT                       │
+│     environment:                                                │
+│       PYRIT_SQLITE_DB_PATH: /workspace/samples/.../pyrit...db   │
+│                                                                 │
+│   jupyter:                                                      │
+│     volumes:                                                    │
+│       - ../../:/workspace  ← SAME VOLUME MOUNT                  │
+│     environment:                                                │
+│       PYRIT_SQLITE_DB_PATH: /workspace/samples/.../pyrit...db   │
+│                                                                 │
+│   gui:                                                          │
+│     volumes:                                                    │
+│       - ../../:/workspace  ← SAME VOLUME MOUNT                  │
+│     environment:                                                │
+│       PYRIT_SQLITE_DB_PATH: /workspace/samples/.../pyrit...db   │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+**Volume Mount Mechanism:**
+
+```
+HOST FILESYSTEM                      CONTAINER FILESYSTEM
+────────────────────────────────────────────────────────────────
+/repo_root/  ←─────── volume bind ─────→ /workspace/
+  ├─ samples/                             ├─ samples/
+  │ └─ security-evaluator/                │ └─ security-evaluator/
+  │   └─ reports/                         │   └─ reports/
+  │     └─ pyrit_ollama_demo.db           │     └─ pyrit_ollama_demo.db
+  │        ↑                              │        ↑
+  │        └──────── SAME FILE ───────────┘
+```
+
+**Key Points:**
+
+- **Volume mount** `../../:/workspace` binds the host repo root to `/workspace` inside the container
+- Both host and containers access the **same database file** on the host disk
+- **No copying**, **no synchronization** - direct access to host filesystem
+- Multiple containers simultaneously access the same `.db` file safely (SQLite file locking)
+
+### HOW MULTIPLE CONTAINERS SHARE ONE DATABASE
+
+All three containers (copyrit, jupyter, gui) in `docker-compose.yaml`:
+
+1. Share the **same volume mount** → `/workspace`
+2. Have the **same environment variable** → `PYRIT_SQLITE_DB_PATH=/workspace/.../pyrit_ollama_demo.db`
+3. Access the **same host file** → no duplication
+4. Use **SQLite's file locking** → safe concurrent access
+
+```
+┌──────────────────────────────────────────────────────┐
+│ docker-compose up -d                                 │
+├──────────────────────────────────────────────────────┤
+│                                                      │
+│  copyrit container    jupyter container    gui      │
+│  ├─ mounts ../../     ├─ mounts ../../      container│
+│  ├─ sets DB_PATH     ├─ sets DB_PATH     ├─ mounts │
+│  │  to /workspace     │  to /workspace    │  ../../  │
+│  │  .../pyrit...db    │  .../pyrit...db   ├─ sets   │
+│  │                    │                   │  DB_PATH │
+│  └─→ FILE A          └─→ FILE A          │ to same  │
+│      (on host)           (on host)       │  path    │
+│                                          └─→ FILE A │
+│                                             (on host)│
+│                                                      │
+│  All see: Same host database file                    │
+│  SQLite prevents conflicts via file locking          │
+│                                                      │
+└──────────────────────────────────────────────────────┘
+```
+
+### VERIFYING SETUP
+
+**1. Check database file on host:**
+
+```bash
+ls -la samples/security-evaluator/reports/pyrit_ollama_demo.db
+sqlite3 samples/security-evaluator/reports/pyrit_ollama_demo.db '.tables'
+```
+
+**2. Start containers and verify access from inside:**
+
+```bash
+docker-compose -f samples/security-evaluator/docker-compose.yaml up -d
+docker-compose -f samples/security-evaluator/docker-compose.yaml exec copyrit bash
+```
+
+**Inside container:**
+
+```bash
+# Verify the file exists via volume mount
+ls -la /workspace/samples/security-evaluator/reports/pyrit_ollama_demo.db
+
+# Access from Python
+python3 << 'EOF'
+import sqlite3
+db = sqlite3.connect('/workspace/samples/security-evaluator/reports/pyrit_ollama_demo.db')
+cursor = db.cursor()
+cursor.execute("SELECT sqlite_version()")
+print(f"SQLite version: {cursor.fetchone()[0]}")
+db.close()
+EOF
+```
+
+**3. Run verification script:**
+
+```bash
+bash samples/security-evaluator/scripts/installers/verify_sqlite_volume_mount.sh
+```
+
+This script verifies:
+- Database file exists on host
+- Docker containers can access the same file
+- File checksums match (same file, not copied)
+- Multi-container sharing works
+
+### TROUBLESHOOTING
+
+**Database file not found in container:**
+- **Cause:** Volume mount misconfigured
+- **Solution:** Check `docker-compose.yaml` has `volumes: ../../:/workspace`
+- **Verify:** `docker-compose exec copyrit ls -la /workspace`
+
+**"Database is locked" errors:**
+- **Cause:** Usually normal SQLite journaling behavior with concurrent access
+- **Solution:** This is expected with high concurrency. Reduce parallel writes or increase SQLite timeout
+- **Check:** SQLite uses OS-level file locking; conflicts should be rare
+
+**Different database content in container vs host:**
+- **Cause:** Likely running different database files or old container images
+- **Solution:**
+  - Verify `PYRIT_SQLITE_DB_PATH` environment variable in compose file
+  - Ensure containers are stopped/rebuilt: `docker-compose down && docker-compose build`
+  - Confirm volume path: `docker-compose exec copyrit echo $PYRIT_SQLITE_DB_PATH`
+
+**Can't write to database from container:**
+- **Cause:** Permission issues on host filesystem
+- **Solution:** 
+  - On Linux: Check file permissions: `ls -la samples/security-evaluator/reports/`
+  - Fix if needed: `chmod 666 samples/security-evaluator/reports/pyrit_ollama_demo.db`
+  - Or use: `docker-compose exec -u root copyrit`
 - Linux: `sudo lsof -i :11434` to find process using port
 
 **Permission denied errors**

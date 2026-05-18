@@ -1,4 +1,4 @@
-.PHONY: all pre-commit mypy test test-cov-html test-cov-xml
+.PHONY: all pre-commit mypy test test-cov-html test-cov-xml setup-sqlite
 
 CMD:=python -m
 PYMODULE:=pyrit
@@ -22,5 +22,10 @@ test-cov-html:
 test-cov-xml:
 	$(CMD) pytest --cov=$(PYMODULE) $(TESTS) --cov-report xml --junitxml=junit/test-results.xml --doctest-modules
 
-#clean:
-#	git clean -Xdf # Delete all files in .gitignore
+setup-sqlite:
+	@echo "Detecting OS and running SQLite installer..."
+	@if [ "$(OS)" = "Windows_NT" ]; then \
+		powershell -ExecutionPolicy Bypass -File samples/security-evaluator/scripts/installers/setup_sqlite_windows.ps1; \
+	else \
+		bash samples/security-evaluator/scripts/installers/setup_sqlite_linux.sh; \
+	fi

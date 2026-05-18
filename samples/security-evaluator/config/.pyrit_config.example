@@ -1,39 +1,107 @@
-# -----------------------------------------------------------------------------
-# Example PyRIT backend config for samples/security-evaluator
-# -----------------------------------------------------------------------------
-# Copy this file to one of these locations depending on your workflow:
-#   1) ~/.pyrit/.pyrit_conf           (auto-discovered by pyrit_backend tools), or
-#   2) project root as .pyrit_config  (if your command/setup reads it explicitly).
+# ═══════════════════════════════════════════════════════════════════════════════
+# PyRIT Configuration Example for security-evaluator
+# ═══════════════════════════════════════════════════════════════════════════════
 #
-# This template is designed for local SQLite + Ollama usage.
+# This file configures PyRIT's core behavior for the security-evaluator workflow.
 #
-# Model reference:
-# - This sample runner uses: llama3.2, mistral, phi3
-# - PyRIT repo template defaults commonly referenced by initializers:
-#   DEFAULT_OPENAI_FRONTEND_MODEL=gpt-4o, OPENAI_CHAT_MODEL=gpt-4o,
-#   OPENAI_EMBEDDING_MODEL=text-embedding-3-small, OLLAMA_MODEL=llama2
-# -----------------------------------------------------------------------------
+# USAGE:
+# ─────────────────────────────────────────────────────────────────────────────
+# Copy this file to ONE of these locations (in order of precedence):
+#
+#   1) ~/.pyrit/.pyrit_config          (auto-discovered by PyRIT tools)
+#      Best for: Machine-wide configuration
+#
+#   2) <repo-root>/.pyrit_config        (explicit project-level config)
+#      Best for: This project's security-evaluator workflow
+#
+#   3) ./config/.pyrit_config           (if running from config directory)
+#      Best for: Containerized environments
+#
+# RELATIONSHIP TO .env.local:
+# ─────────────────────────────────────────────────────────────────────────────
+# - .pyrit_config: Global PyRIT behavior (memory type, operators, logging)
+# - .env.local:    Model endpoints and feature toggles (loaded by .pyrit_config)
+#
+# This file references .env.local via the env_files field below.
+#
+# ═══════════════════════════════════════════════════════════════════════════════
 
-# Memory backend type used by PyRIT history and scan tools.
+# Type of memory backend used by PyRIT for conversation history, artifacts, and scoring.
+# REQUIRED: Must match your storage setup.
+# Options: sqlite (local file), cosmos (Azure), sql (server)
+# For security-evaluator: Always use 'sqlite' for local workflow
 memory_db_type: sqlite
 
-# Optional operation metadata shown in stored records.
+# Operator name - identifies who is running this security evaluation.
+# This value is stored in all run artifacts and reports for traceability.
+# Examples: \"local_redteam\", \"automated_ci\", \"john_doe\", \"security_team\"
 operator: local_security_evaluator
+
+# Operation name - identifies this specific campaign or evaluation purpose.
+# This value is stored with each run result for organization and filtering.
+# Examples: \"owasp_ollama_example\", \"baseline_llm_tests\", \"model_validation_2024\"
 operation: security_evaluator_owasp_eval
 
-# Keep empty for local Ollama-only setups.
-# Add initializers only if you need cloud providers (OpenAI/Azure/etc.).
+# Initializers list - PyRIT components to load on startup.
+# IMPORTANT: For local Ollama-only setups, this should be EMPTY.
+# 
+# Initializers are only needed when connecting to cloud services:
+# Examples:
+#   - azure_auth      (for Azure OpenAI, Azure ML)
+#   - openai_auth     (for OpenAI API)
+#   - anthropic_auth  (for Anthropic Claude)
+#
+# For security-evaluator (local Ollama only): Leave empty
 initializers: []
 
-# Environment files to load before startup.
-# Point this to your real env file (usually copied from config/.env.local.example).
-# Example if running commands from samples/security-evaluator:
+# Environment files to load before PyRIT startup.
+# These files provide model endpoints, credentials, and runtime parameters.
+# Use relative paths; they're resolved from the directory containing this config.
+#
+# Standard locations:
+#   - ./.env.local          (run from repo root)
+#   - ./config/.env.local   (run from config subdirectory)
 env_files:
   - ./.env.local
 
-# If you keep .env.local inside config/, switch to:
-# env_files:
-#   - ./config/.env.local
-
-# Set true to reduce non-error output from backend tools.
+# Reduce non-error logging output from PyRIT backend tools.
+# Recommended: false for initial setup (full diagnostics), true for production
 silent: false
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# REFERENCE: Expected .env.local Variables
+# ═══════════════════════════════════════════════════════════════════════════════
+#
+# This config expects the following variables in .env.local:
+#
+# OLLAMA ENDPOINTS & MODELS:
+#   OLLAMA_ENDPOINT                    = http://localhost:11434/v1
+#   OLLAMA_TARGET_MODEL                = llama3.2
+#   OLLAMA_ATTACKER_MODEL              = mistral
+#   OLLAMA_CONVERTER_MODEL             = phi3
+#   OLLAMA_TF_SCORER_MODEL             = phi3
+#   OLLAMA_SCALE_SCORER_MODEL          = phi3
+#   OLLAMA_REFUSAL_SCORER_MODEL        = phi3
+#   OLLAMA_SCORER_MODEL                = phi3
+#   OLLAMA_MODEL                       = llama2
+#
+# SQLITE DATABASE:
+#   PYRIT_SQLITE_DB_PATH               = reports/pyrit_ollama_demo.db
+#
+# OUTPUT PATHS:
+#   ARTIFACTS_ROOT_PATH                = reports
+#   LOGS_ROOT_PATH                     = logs
+#   SCORER_COMPARISON_CSV_PATH         = reports/scorer_comparison.csv
+#   SCORER_OUTPUTS_JSON_PATH           = reports/scorer_outputs.json
+#   BATCH_SCORER_CHECK_JSON_PATH       = reports/batch_scorer_check.json
+#   RUN_REPORT_JSON_PATH               = reports/run_report.json
+#   REPORTS_ROOT_PATH                  = reports/cases
+#
+# RUNTIME BEHAVIOR:
+#   DEBUG                              = false
+#   ALLOW_RUNTIME_PIP_INSTALL          = false
+#   PYRIT_MAX_TURNS                    = 4
+#   RESUME_INCOMPLETE_RUN              = true
+#
+# For complete reference, see: samples/security-evaluator/config/.env.local.example
+# ═══════════════════════════════════════════════════════════════════════════════

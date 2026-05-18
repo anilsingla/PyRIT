@@ -1,0 +1,23 @@
+# Dockerfile for quick setup: PyRIT + CoPyRIT
+# Usage: docker build -t pyrit-copyrit-quick -f Dockerfile.pyrit-copyrit-quick .
+
+FROM python:3.11-slim
+
+WORKDIR /workspace
+
+# Install system dependencies (if needed)
+RUN apt-get update && apt-get install -y git && rm -rf /var/lib/apt/lists/*
+
+# Install PyRIT and CoPyRIT
+RUN pip install --upgrade pip \
+    && pip install pyrit copyrit jupyterlab streamlit
+
+# Copy example config files (optional, for demo)
+COPY samples/security-evaluator/config/.env.local.example /workspace/.env.local
+COPY samples/security-evaluator/config/.pyrit_config.example /workspace/.pyrit_config
+
+# Expose ports for Jupyter and Streamlit GUIs
+EXPOSE 8888 8501
+
+# Default command: start JupyterLab and Streamlit in background, then idle
+CMD ["bash", "-c", "jupyter lab --ip=0.0.0.0 --port=8888 --no-browser --allow-root & streamlit run /workspace/doc/code/pyrit_gui.py --server.port=8501 --server.address=0.0.0.0 & tail -f /dev/null"]

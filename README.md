@@ -30,6 +30,46 @@ protect against prompt injection attacks.
 
 ![PyRIT architecture](https://github.com/Azure/PyRIT/blob/main/assets/pyrit_architecture.png)
 
+## Visual Architecture Diagram
+
+This diagram shows how the host machine, Docker containers, database, and Ollama server interact in the security evaluator setup. The host mounts the repo into the container, which runs PyRIT CLI, CoPyRIT GUI, and JupyterLab. All tools share the same SQLite database file and communicate with the Ollama server for LLM inference.
+
+```mermaid
+flowchart TD
+    A[User Machine / Host] -->|Volume Mount| B[/Docker Container: PyRIT & CoPyRIT/]
+    B --> C[PyRIT CLI]
+    B --> D[CoPyRIT GUI (Streamlit)]
+    B --> E[JupyterLab]
+    B --> F[Shared SQLite DB (reports/pyrit_ollama_demo.db)]
+    C --> F
+    D --> F
+    E --> F
+    A --> G[Ollama Server]
+    C --> G
+    D --> G
+    E --> G
+    subgraph Docker Compose
+      B
+    end
+```
+
+## Config Loading and Data Flow
+
+This diagram illustrates how configuration files (`.env.local` and `.pyrit_config`) are loaded into the backend, how environment variables are set, and how the attack runner produces artifacts and reports that are then analyzed by the GUI or Jupyter, ultimately presenting results to the user.
+
+```mermaid
+flowchart LR
+    subgraph Config Loading
+      A[.env.local] -->|env_files| B[.pyrit_config]
+      B -->|loads| C[PyRIT Backend]
+      C -->|reads| D[Docker/Host Environment]
+    end
+    D -->|provides| E[Attack Runner]
+    E -->|writes| F[Artifacts/Reports]
+    F -->|analyzed by| G[GUI/Jupyter]
+    G -->|shows| H[User]
+```
+
 ## Where can I learn more?
 
 Microsoft Learn has a
@@ -42,6 +82,43 @@ and more, as well as our [demos](https://github.com/Azure/PyRIT/tree/main/doc/de
 
 For the security evaluator sample, use the dedicated user guide at [samples/security-evaluator/docs/SECURITY_EVALUATOR_USER_GUIDE.md](samples/security-evaluator/docs/SECURITY_EVALUATOR_USER_GUIDE.md) for a full, sequential walkthrough.
 
+## Quick Start
+
+1. **Run the onboarding wizard:**
+   ```bash
+   python samples/security-evaluator/scripts/helper/onboarding_wizard.py
+   ```
+2. **Try the Jupyter notebook quickstart:**
+   Open `notebooks/Redteam_Quickstart_Template.ipynb` in JupyterLab.
+3. **Generate a Markdown report:**
+   ```bash
+   python samples/security-evaluator/scripts/helper/generate_markdown_report.py
+   ```
+
+## Example .env.local
+```ini
+OLLAMA_ENDPOINT=http://localhost:11434/v1
+OLLAMA_TARGET_MODEL=llama3.2
+OLLAMA_ATTACKER_MODEL=mistral
+OLLAMA_CONVERTER_MODEL=phi3
+OLLAMA_TF_SCORER_MODEL=phi3
+OLLAMA_SCALE_SCORER_MODEL=llama2
+OLLAMA_REFUSAL_SCORER_MODEL=mistral
+OLLAMA_SCORER_MODEL=phi3
+PYRIT_SQLITE_DB_PATH=reports/pyrit_ollama_demo.db
+```
+
+## Example .pyrit_config
+```yaml
+memory_db_type: sqlite
+operator: local_redteam
+operation: owasp_ollama_example
+initializers: []
+env_files:
+  - ./.env.local
+silent: false
+```
+
 ## Trademarks
 
 This project may contain trademarks or logos for projects, products, or services.
@@ -51,3 +128,56 @@ Use of Microsoft trademarks or logos in modified versions of this project must
 not cause confusion or imply Microsoft sponsorship.
 Any use of third-party trademarks or logos are subject to those third-party's
 policies.
+
+---
+
+## Attack Mode Flow
+
+This diagram explains the logic for the three main attack modes:
+- **Baseline**: Sends seed prompts, collects and scores responses, and generates a report.
+- **TAP (Tree-of-Attacks)**: Builds a branching attack tree, collects responses at each node, and scores them.
+- **Crescendo**: Iteratively attacks, backtracking on refusals, then collects and scores responses.
+All modes converge on report generation and analysis.
+
+```mermaid
+flowchart TD
+    A[Start Attack] --> B{Attack Mode}
+    B -->|Baseline| C[Send Seed Prompts]
+    C --> D[Collect Responses]
+    D --> E[Score Responses]
+    E --> F[Generate Report]
+    B -->|TAP| G[Tree-of-Attacks]
+    G --> H[Branching/Depth]
+    H --> D
+    B -->|Crescendo| I[Crescendo Loop]
+    I --> J[Backtrack on Refusal]
+    J --> D
+    style G fill:#e0f7fa
+    style I fill:#ffe0b2
+    style C fill:#e1bee7
+    style D fill:#fff9c4
+    style E fill:#c8e6c9
+    style F fill:#b3e5fc
+```
+
+This diagram shows the flow for Baseline, TAP, and Crescendo attack modes.
+
+---
+
+## Plugin Architecture (Extensibility)
+
+This diagram shows how PyRIT can be extended with custom attack and scorer plugins. The core loads plugins, which feed into the attack runner and scoring engine. Results are written to artifacts/reports, which are then visualized in the GUI or Jupyter for the user.
+
+```mermaid
+flowchart TD
+    subgraph Plugin Architecture
+      A[PyRIT Core] --> B[Attack Plugins]
+      A --> C[Scorer Plugins]
+      B --> D[Attack Runner]
+      C --> E[Scoring Engine]
+      D --> F[Artifacts/Reports]
+      E --> F
+    end
+    F --> G[GUI/Jupyter]
+    G --> H[User]
+```
