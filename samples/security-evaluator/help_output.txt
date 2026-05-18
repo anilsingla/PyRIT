@@ -1,0 +1,207 @@
+﻿
+================================================================================
+|                      PyRIT x Ollama ΓÇô OWASP Red-Team Suite                   |
+|                           Comprehensive CLI Help                             |
+================================================================================
+
+ATTACK MODES (choose with --attack-mode)
+----------------------------------------
+
+  baseline      PromptSendingAttack compliance baseline (default).
+                Single-turn, no attacker. Good for control/baseline comparisons.
+
+  redteam       Multi-turn adversarial RedTeamingAttack.
+                Tests all 10 OWASP LLM Top-10 scenarios with conversational attacks.
+                Supports --turn-mode single|multi for 1-turn or N-turn conversations.
+
+  tap           Tree-of-Attacks with Pruning ΓÇô branching adversarial search.
+                Multi-turn, explores jailbreak trees with width/depth/branching control.
+                Options: --tap-width, --tap-depth, --tap-branching-factor
+
+  crescendo     Crescendo ΓÇô escalating multi-turn attack with automatic backtracking.
+                Gradually increases adversarial pressure; backs off on failures.
+                Option: --max-backtracks
+
+  xpia          Cross-Prompt Injection Attack ΓÇô hidden instruction injection.
+                Single-turn injection-based attack simulating prompt mashup scenarios.
+
+UTILITY MODES
+-------------
+
+  rescore       Re-score existing SQLite conversations without re-running attacks.
+                Use after scorer changes. Reads from SQLITE_DB_PATH, exports JSON/CSV.
+
+  report        Generate HTML/Markdown report from existing run artifacts.
+                Reads scorer outputs and case reports, generates HTML + JSON summary.
+
+MAIN OPTIONS
+------------
+
+  --turn-mode {single|multi}
+                Single-turn (max_turns=1, conservative/fast) or multi-turn conversations.
+                Only valid for redteam, tap, crescendo. Baseline/xpia are single-turn only.
+                Env fallback: PYRIT_ATTACK_TURN_MODE (default: single)
+
+  --converters [CONV ...]
+                Converter keys for prompt obfuscation (space or comma-separated).
+                14 available: 11 stateless (base64, rot13, caesar, ...) + 3 LLM-based (tone_persuasive, ...).
+                Env fallback: PYRIT_DEFAULT_CONVERTERS
+                See: --converter-info for detailed descriptions
+
+  --all-converters
+                Use all 14 converters instead of default selection.
+                Env fallback: PYRIT_USE_ALL_CONVERTERS (1|true|yes)
+
+  --datasets [DATASET ...]
+                Seed dataset names (space or comma-separated).
+                Examples: harmbench, pyrit_example_dataset, beaver_tails, toxic_chat.
+                50+ available datasets. Env fallback: PYRIT_DEFAULT_DATASETS (default: harmbench)
+
+  --all-datasets
+                Use all 50+ available datasets instead of default.
+                Env fallback: PYRIT_USE_ALL_DATASETS (1|true|yes)
+
+  --scorers [SCORER ...]
+                Scorer keys for LLM response evaluation (space or comma-separated).
+                Available: substring, self_ask_true_false, self_ask_scale,
+                          scale_threshold_0_7, refusal, compliance_inverted_refusal
+                Env fallback: PYRIT_DEFAULT_SCORERS (default: self_ask_true_false)
+
+  --all-scorers
+                Run all 6+ available scorers simultaneously.
+                Env fallback: PYRIT_USE_ALL_SCORERS (1|true|yes)
+
+  --scenarios [OWASP_ID ...]
+                OWASP LLM Top-10 vulnerability IDs to attack (space or comma-separated).
+                Examples: LLM01 LLM02 LLM03 ... LLM10 for all.
+                LLM01=Prompt Injection, LLM02=Insecure Output, LLM03=Training Poisoning, etc.
+                Omit for all 10. (tap/crescendo/xpia/baseline only)
+
+EXECUTION CONTROL
+-----------------
+
+  --dry-run
+                Print execution plan with dataset/converter/scenario counts, then exit.
+                No prompts are sent; useful for quick validation before full run.
+
+  --local-datasets-only
+                Skip remote dataset provider fetches; use only locally-cached datasets.
+                Faster initialization, smaller memory footprint.
+
+REPORT & OUTPUT OPTIONS (report mode only)
+-------------------------------------------
+
+  --output-html PATH
+                Write HTML report to custom path. Default: reports/run_report.html
+
+  --output-md PATH
+                Write Markdown report to custom path.
+
+  --output-json PATH
+                Write JSON report to custom path. Default: reports/report_summary.json
+
+  --open
+                Open generated HTML report in browser after generation.
+
+TAP-SPECIFIC OPTIONS (--attack-mode tap)
+-----------------------------------------
+
+  --tap-width INT           Number of attack branches (default: PyRIT's default)
+  --tap-depth INT           Max tree depth per scenario (default: PyRIT's default)
+  --tap-branching-factor INT  Child nodes per branch (default: PyRIT's default)
+
+CRESCENDO-SPECIFIC OPTIONS (--attack-mode crescendo)
+-----------------------------------------------------
+
+  --max-backtracks INT      Maximum backtrack count (default: PyRIT's default)
+  --max-turns INT           Max conversation turns (default: 4)
+
+BASELINE-SPECIFIC OPTIONS (--attack-mode baseline)
+---------------------------------------------------
+
+  --max-seeds INT           Max seeds per scenario (0=unlimited, default: unlimited)
+
+RESCORE-SPECIFIC OPTIONS (--attack-mode rescore)
+--------------------------------------------------
+
+  --filter-owasp [ID ...]   Limit re-scoring to specific OWASP scenarios
+
+INFORMATION OPTIONS
+-------------------
+
+  --converter-info
+                Display converter selection guide with all 14 converters,
+                categories, use cases, benefits, and examples. Then exit.
+
+  --detailed-help
+                Display this comprehensive help. Then exit.
+
+  --help
+                Display basic help with attack modes and usage summary.
+
+ENVIRONMENT VARIABLES (Config Precedence: CLI > Env > Code Defaults)
+---------------------------------------------------------------------
+
+  PYRIT_ATTACK_TURN_MODE        Turn mode selection: "single" | "multi" (default: single)
+  PYRIT_DEFAULT_DATASETS        Default dataset selection: "harmbench,pyrit_example_dataset" (default: harmbench)
+  PYRIT_DEFAULT_CONVERTERS      Default converters: "base64,leetspeak,emoji" (default: all stateless)
+  PYRIT_DEFAULT_SCORERS         Default scorers: "self_ask_true_false,refusal" (default: self_ask_true_false)
+  PYRIT_USE_ALL_DATASETS        Force all datasets: "1" | "true" | "yes" (default: false)
+  PYRIT_USE_ALL_CONVERTERS      Force all converters: "1" | "true" | "yes" (default: false)
+  PYRIT_USE_ALL_SCORERS         Force all scorers: "1" | "true" | "yes" (default: false)
+  PYRIT_DEFAULT_SCENARIOS       Default OWASP scenarios: "LLM01,LLM02,LLM03" (default: all 10)
+  PYRIT_DEFAULT_FILTER_OWASP    Rescore: filter scenarios by OWASP IDs
+  RUNNER_LOG_PATH               Logging file path (default: logs/pyrit_runner.log)
+
+EXAMPLES
+--------
+
+  # Quick dry-run with defaults (harmbench, self_ask_true_false, single-turn)
+  python scripts/app/main.py --dry-run --local-datasets-only
+
+  # Red-team all 10 OWASP with specific converters and single-turn
+  python scripts/app/main.py --attack-mode redteam --turn-mode single \
+    --converters base64,leetspeak,emoji --dry-run
+
+  # Multi-turn red-team with all datasets and converters
+  python scripts/app/main.py --attack-mode redteam --turn-mode multi \
+    --all-datasets --all-converters --all-scorers
+
+  # Baseline compliance scan on harmbench (default)
+  python scripts/app/main.py --attack-mode baseline --dry-run
+
+  # TAP with custom depth and branching
+  python scripts/app/main.py --attack-mode tap --turn-mode multi \
+    --tap-depth 3 --tap-width 5 --tap-branching-factor 2 --dry-run
+
+  # Crescendo with max backtracks
+  python scripts/app/main.py --attack-mode crescendo \
+    --max-backtracks 5 --max-turns 10 --dry-run
+
+  # Re-score existing conversations with new scorers
+  python scripts/app/main.py --attack-mode rescore \
+    --scorers substring,refusal --filter-owasp LLM01 LLM02
+
+  # Display converter guide
+  python scripts/app/main.py --converter-info
+
+BEST PRACTICES
+ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+
+  1. Start with --dry-run to validate configuration before running full attacks.
+  2. Use --local-datasets-only to avoid network delays during initialization.
+  3. For quick testing: combine simple converters (base64, leetspeak) with limited datasets.
+  4. For comprehensive evaluation: use --all-converters, --all-datasets, --all-scorers.
+  5. Set environment variables in .env file for consistent defaults across runs.
+  6. Use --turn-mode single for faster baseline; --turn-mode multi for adversarial depth.
+
+TROUBLESHOOTING
+---------------
+
+  - "turn-mode 'multi' requires a multi-turn attack mode" ΓåÆ Use redteam/tap/crescendo, not baseline/xpia
+  - "No scenarios matched" ΓåÆ Check --scenarios format (e.g., LLM01, not LLM01, with space)
+  - Slow initialization ΓåÆ Use --local-datasets-only to skip remote dataset fetches
+  - Out of memory ΓåÆ Use --converters sparingly, reduce --tap-width, or use --max-seeds
+
+================================================================================
+    

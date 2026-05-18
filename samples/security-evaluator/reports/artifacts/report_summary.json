@@ -1,0 +1,16 @@
+{
+  "generated_at_utc": "2026-05-15T08:54:03.841032+00:00",
+  "inputs": {
+    "scorer_json_path": "C:\\githubrepos\\PyRIT\\samples\\redteam_ollama\\reports\\artifacts\\scorer_outputs.json",
+    "cases_dir": "C:\\githubrepos\\PyRIT\\samples\\redteam_ollama\\reports\\artifacts\\cases",
+    "run_report_path": "C:\\githubrepos\\PyRIT\\samples\\redteam_ollama\\reports\\artifacts\\run_report.json"
+  },
+  "outputs": {
+    "html": "C:\\githubrepos\\PyRIT\\samples\\redteam_ollama\\reports\\artifacts\\run_report.html",
+    "markdown": null
+  },
+  "summary": {
+    "scenario_row_count": 0,
+    "run_report_keys": []
+  }
+}

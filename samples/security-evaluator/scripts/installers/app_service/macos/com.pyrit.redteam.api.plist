@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+  <dict>
+    <key>Label</key>
+    <string>com.pyrit.redteam.api</string>
+
+    <key>ProgramArguments</key>
+    <array>
+      <string>/usr/bin/python3</string>
+      <string>-m</string>
+      <string>api.run_api</string>
+    </array>
+
+    <key>WorkingDirectory</key>
+    <string>/opt/PyRIT/samples/security-evaluator</string>
+
+    <key>EnvironmentVariables</key>
+    <dict>
+      <key>API_HOST</key>
+      <string>0.0.0.0</string>
+      <key>API_PORT</key>
+      <string>8088</string>
+      <key>API_RELOAD</key>
+      <string>false</string>
+    </dict>
+
+    <key>RunAtLoad</key>
+    <true/>
+    <key>KeepAlive</key>
+    <true/>
+
+    <key>StandardOutPath</key>
+    <string>/tmp/pyrit-redteam-api.out.log</string>
+    <key>StandardErrorPath</key>
+    <string>/tmp/pyrit-redteam-api.err.log</string>
+  </dict>
+</plist>

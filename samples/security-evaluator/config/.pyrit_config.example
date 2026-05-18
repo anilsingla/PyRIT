@@ -1,0 +1,39 @@
+# -----------------------------------------------------------------------------
+# Example PyRIT backend config for samples/security-evaluator
+# -----------------------------------------------------------------------------
+# Copy this file to one of these locations depending on your workflow:
+#   1) ~/.pyrit/.pyrit_conf           (auto-discovered by pyrit_backend tools), or
+#   2) project root as .pyrit_config  (if your command/setup reads it explicitly).
+#
+# This template is designed for local SQLite + Ollama usage.
+#
+# Model reference:
+# - This sample runner uses: llama3.2, mistral, phi3
+# - PyRIT repo template defaults commonly referenced by initializers:
+#   DEFAULT_OPENAI_FRONTEND_MODEL=gpt-4o, OPENAI_CHAT_MODEL=gpt-4o,
+#   OPENAI_EMBEDDING_MODEL=text-embedding-3-small, OLLAMA_MODEL=llama2
+# -----------------------------------------------------------------------------
+
+# Memory backend type used by PyRIT history and scan tools.
+memory_db_type: sqlite
+
+# Optional operation metadata shown in stored records.
+operator: local_security_evaluator
+operation: security_evaluator_owasp_eval
+
+# Keep empty for local Ollama-only setups.
+# Add initializers only if you need cloud providers (OpenAI/Azure/etc.).
+initializers: []
+
+# Environment files to load before startup.
+# Point this to your real env file (usually copied from config/.env.local.example).
+# Example if running commands from samples/security-evaluator:
+env_files:
+  - ./.env.local
+
+# If you keep .env.local inside config/, switch to:
+# env_files:
+#   - ./config/.env.local
+
+# Set true to reduce non-error output from backend tools.
+silent: false
