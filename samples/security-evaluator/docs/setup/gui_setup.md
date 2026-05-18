@@ -344,6 +344,37 @@ The GUI queries these SQLite tables:
 
 When you import `scorer_outputs.json`, the import script populates the `scores` and `memory_labels` tables so GUI can query and display them.
 
+## Sharing reports across systems
+
+If your run environment is separate from the GUI host, transfer the report JSON file and import it locally.
+
+Recommended workflow:
+
+1. Export `reports/scorer_outputs.json` from the run host.
+2. Copy the file to the GUI machine.
+3. Run the import tool on the GUI host:
+
+```bash
+cd samples/security-evaluator
+python scripts/analysis/import_scorer_json_to_memory.py \
+  --input-json /path/to/scorer_outputs.json \
+  --db-path /path/to/pyrit_ollama_gui.db
+```
+
+If you need a helper to export run artifacts into a portable directory, use:
+
+```bash
+python scripts/analysis/export_scorer_outputs_for_gui.py \
+  --input-json reports/scorer_outputs.json \
+  --output-dir exported_gui_reports \
+  --include-run-report \
+  --include-comparison-csv
+```
+
+If the same SQLite database is already available on the GUI host, you can skip import and point the GUI at that DB file by setting `PYRIT_SQLITE_DB_PATH`.
+
+See also: [GUI data transfer guide](./gui_data_transfer.md)
+
 ## When to use each method
 
 | Need | Method | Time | Complexity |

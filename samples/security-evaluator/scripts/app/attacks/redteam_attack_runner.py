@@ -343,6 +343,18 @@ async def run_redteam_suite_async(
 
     resume_state = load_resume_state()
     if bool(resume_state.get("completed", False)):
+        print("[v] Previous checkpoint indicates a completed run; starting a fresh execution.")
+        resume_state = initial_resume_state()
+
+    current_run_config = {
+        "selected_converters": sorted(selected_converters) if selected_converters else [],
+        "selected_datasets": sorted(selected_dataset_names) if selected_dataset_names else [],
+        "selected_scorers": sorted(selected_scorers) if selected_scorers else [],
+        "run_all_available_datasets": RUN_ALL_AVAILABLE_DATASETS,
+        "max_datasets_per_scenario": MAX_DATASETS_PER_SCENARIO,
+    }
+    if resume_state.get("run_config") != current_run_config:
+        print("[v] Resume checkpoint configuration changed; discarding previous checkpoint.")
         resume_state = initial_resume_state()
 
     scenario_execution_plan = build_execution_plan(
@@ -354,6 +366,18 @@ async def run_redteam_suite_async(
     )
 
     start_index = int(cast(int, resume_state.get("next_scenario_index", 0)))
+    if start_index >= len(scenario_execution_plan):
+        if start_index > 0:
+            print(
+                "[!] Resume checkpoint index is beyond the current execution plan. "
+                "The current run selection may differ from the saved checkpoint."
+            )
+        resume_state = initial_resume_state()
+        start_index = 0
+
+    if start_index > 0:
+        print(f"[v] Resuming run from scenario index {start_index} of {len(scenario_execution_plan)}.")
+
     results_summary: list[dict] = list(resume_state.get("results_summary", []))  # type: ignore[type-arg]
     scorer_comparisons: list[dict] = list(resume_state.get("scorer_comparisons", []))  # type: ignore[type-arg]
     scorer_outputs_json_rows: list[dict[str, object]] = list(resume_state.get("scorer_outputs_json_rows", []))
@@ -668,6 +692,7 @@ async def run_redteam_suite_async(
             "results_summary": results_summary,
             "scorer_comparisons": scorer_comparisons,
             "scorer_outputs_json_rows": scorer_outputs_json_rows,
+            "run_config": current_run_config,
         }
         save_resume_state(state=resume_state)
 
@@ -821,7 +846,7 @@ async def run_redteam_suite_async(
 
     save_resume_state(
         state={
-            "next_scenario_index": len(OWASP_SCENARIOS),
+            "next_scenario_index": len(scenario_execution_plan),
             "completed": True,
             "totals": final_totals,
             "results_summary": results_summary,

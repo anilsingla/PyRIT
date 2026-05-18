@@ -24,7 +24,11 @@ from .env_config import (
 
 
 def _join_slug_parts(*, values: list[str], empty_label: str) -> str:
-    parts = [slugify_for_path(value=value) for value in values if slugify_for_path(value=value)]
+    parts: list[str] = []
+    for value in values:
+        slug = slugify_for_path(value=value)
+        if slug:
+            parts.append(slug)
     if not parts:
         return empty_label
     return "__".join(parts)
@@ -187,6 +191,13 @@ def initial_resume_state() -> dict[str, Any]:
         "results_summary": [],
         "scorer_comparisons": [],
         "scorer_outputs_json_rows": [],
+        "run_config": {
+            "selected_converters": [],
+            "selected_datasets": [],
+            "selected_scorers": [],
+            "run_all_available_datasets": False,
+            "max_datasets_per_scenario": 0,
+        },
     }
 
 
@@ -227,6 +238,16 @@ def load_resume_state() -> dict[str, Any]:
         value = loaded.get(key)
         if isinstance(value, list):
             state[key] = value
+
+    loaded_run_config = loaded.get("run_config")
+    if isinstance(loaded_run_config, dict):
+        state["run_config"] = {
+            "selected_converters": list(loaded_run_config.get("selected_converters", [])),
+            "selected_datasets": list(loaded_run_config.get("selected_datasets", [])),
+            "selected_scorers": list(loaded_run_config.get("selected_scorers", [])),
+            "run_all_available_datasets": bool(loaded_run_config.get("run_all_available_datasets", False)),
+            "max_datasets_per_scenario": int(loaded_run_config.get("max_datasets_per_scenario", 0)),
+        }
 
     debug_log(message=f"Loaded resume state at next_scenario_index={state['next_scenario_index']}")
     return state

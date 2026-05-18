@@ -40,8 +40,10 @@ from redteam_runner.env_config import (
     MAX_TURNS,
     OLLAMA_ATTACKER_MODEL,
     OLLAMA_ENDPOINT,
+    OLLAMA_SCALE_SCORER_MODEL,
     OLLAMA_TARGET_MODEL,
     OLLAMA_TF_SCORER_MODEL,
+    OLLAMA_REFUSAL_SCORER_MODEL,
     OWASPScenario,
     OWASP_SCENARIOS,
     RUN_ALL_AVAILABLE_DATASETS,
@@ -61,6 +63,7 @@ from redteam_runner.scoring_ops import (
     extract_last_assistant_text,
     run_scorer_comparison_async,
 )
+from redteam_runner.cli_utils import parse_token_set
 
 _LOG = logging.getLogger(__name__)
 
@@ -175,6 +178,8 @@ async def run_crescendo_suite_async(
     objective_target = build_ollama_target(model_name=OLLAMA_TARGET_MODEL, temperature=0.7)
     adversarial_target = build_ollama_target(model_name=OLLAMA_ATTACKER_MODEL, temperature=0.9)
     tf_scorer_target = build_ollama_target(model_name=OLLAMA_TF_SCORER_MODEL, temperature=0.0)
+    scale_scorer_target = build_ollama_target(model_name=OLLAMA_SCALE_SCORER_MODEL, temperature=0.0)
+    refusal_scorer_target = build_ollama_target(model_name=OLLAMA_REFUSAL_SCORER_MODEL, temperature=0.0)
 
     attack_config = AttackAdversarialConfig(target=adversarial_target)
     printer = ConsoleAttackResultPrinter()
@@ -226,8 +231,8 @@ async def run_crescendo_suite_async(
                 response_text=last_text or "(no output)",
                 objective=scenario.objective,
                 tf_scorer_target=tf_scorer_target,
-                scale_scorer_target=build_ollama_target(model_name=OLLAMA_TF_SCORER_MODEL, temperature=0.0),
-                refusal_scorer_target=build_ollama_target(model_name=OLLAMA_TF_SCORER_MODEL, temperature=0.0),
+                scale_scorer_target=scale_scorer_target,
+                refusal_scorer_target=refusal_scorer_target,
                 selected_scorers=selected_scorers,
             )
 
@@ -281,16 +286,12 @@ def main() -> None:
     parser = _build_parser()
     args = parser.parse_args()
 
-    def _tokens(values: list[str]) -> set[str] | None:
-        flat = {token.strip() for value in values for token in value.split(",") if token.strip()}
-        return flat or None
-
     try:
         asyncio.run(
             run_crescendo_suite_async(
-                selected_scenario_ids=_tokens(args.scenarios),
-                selected_dataset_names=_tokens(args.datasets),
-                selected_scorers=_tokens(args.scorers),
+                selected_scenario_ids=parse_token_set(args.scenarios),
+                selected_dataset_names=parse_token_set(args.datasets),
+                selected_scorers=parse_token_set(args.scorers),
                 max_backtracks=args.max_backtracks,
                 max_turns=args.max_turns,
                 dry_run=bool(args.dry_run),

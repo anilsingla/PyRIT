@@ -44,6 +44,7 @@ from redteam_runner.env_config import (
     configure_runner_logging,
     initialize_pyrit_async,
 )
+from redteam_runner.cli_utils import parse_token_set
 from redteam_runner.scoring_ops import (
     AVAILABLE_SCORER_KEYS,
     extract_last_assistant_text,
@@ -178,15 +179,11 @@ def main() -> None:
     parser = _build_parser()
     args = parser.parse_args()
 
-    def _tokens(values: list[str]) -> set[str] | None:
-        flat = {t.strip() for v in values for t in v.split(",") if t.strip()}
-        return flat or None
-
     asyncio.run(
         run_batch_rescore_async(
             db_path=args.db_path,
-            selected_scorers=_tokens(args.scorers),
-            filter_owasp=_tokens(args.filter_owasp),
+            selected_scorers=parse_token_set(args.scorers),
+            filter_owasp=parse_token_set(args.filter_owasp),
             output_json=args.output_json,
             dry_run=bool(args.dry_run),
         )

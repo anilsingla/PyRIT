@@ -5,6 +5,7 @@ Select your preferred setup method:
 - **[Local Installation](local_setup.md)**  - Install PyRIT directly on your machine.
 - **[Docker Setup](docker_setup.md)**  - Run PyRIT in containers with host Ollama integration.
 - **[GUI Tutorial](gui_setup.md)**  - Set up and run the PyRIT GUI for analysis and scoring.
+- **[GUI report transfer](gui_data_transfer.md)** - Move generated JSON reports between run hosts and GUI hosts.
 
 ## Quick start (new users)
 

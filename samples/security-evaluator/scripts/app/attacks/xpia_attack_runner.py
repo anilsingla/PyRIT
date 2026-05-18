@@ -25,6 +25,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 from pyrit.executor.workflow import XPIAContext, XPIATestWorkflow
 from pyrit.models import Message, MessagePiece
+from redteam_runner.cli_utils import parse_token_set
 from redteam_runner.converter_ops import build_ollama_target
 from redteam_runner.env_config import (
     OLLAMA_ENDPOINT,
@@ -196,12 +197,8 @@ def main() -> None:
     parser = _build_parser()
     args = parser.parse_args()
 
-    def _tokens(values: list[str]) -> set[str] | None:
-        flat = {token.strip() for value in values for token in value.split(",") if token.strip()}
-        return flat or None
-
     try:
-        asyncio.run(run_xpia_suite_async(selected_scenario_ids=_tokens(args.scenarios), dry_run=bool(args.dry_run)))
+        asyncio.run(run_xpia_suite_async(selected_scenario_ids=parse_token_set(args.scenarios), dry_run=bool(args.dry_run)))
     except KeyboardInterrupt:
         _LOG.warning("Interrupted by user")
         sys.exit(130)

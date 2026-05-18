@@ -15,9 +15,13 @@ New to this package? Start here:
 
 Learn how to install, configure, and use PyRIT:
 
+- **[Security Evaluator User Guide](./SECURITY_EVALUATOR_USER_GUIDE.md)** � central walkthrough for setup, configuration, reports, and attack modes
 - **[Local Installation](./setup/local_setup.md)** � Install PyRIT locally on Linux, macOS, or Windows
-- **[Docker Setup](./setup/docker_setup.md)** � Run PyRIT in Docker containers with host Ollama
+- **[Docker Setup](./setup/docker_setup.md)** � Run PyRIT in containers with host Ollama
 - **[GUI Tutorial](./setup/gui_setup.md)** � Set up and use the PyRIT graphical interface for analysis
+- **[GUI report transfer](./setup/gui_data_transfer.md)** � export/import JSON reports between run hosts and GUI hosts
+- **[Configuration field reference](./script/configuration_fields.md)** � explicit `.env` and `.pyrit_config` field definitions
+- **[Report analysis](./script/report_analysis.md)** � how to interpret generated output files and logs
 
 ?? **New to PyRIT?** Start with [PyRIT Installation Guide](./setup/README.md)
 

@@ -66,6 +66,7 @@ from redteam_runner.reporting_ops import (
     export_scorer_outputs_json,
 )
 from redteam_runner.scoring_ops import extract_last_assistant_text, run_scorer_comparison_async, score_to_json_dict
+from redteam_runner.cli_utils import parse_token_set
 from pyrit.executor.attack import PromptSendingAttack
 
 _LOG = logging.getLogger(__name__)
@@ -86,6 +87,19 @@ def _build_parser() -> argparse.ArgumentParser:
                         help="Maximum seeds per scenario (0 = unlimited).")
     parser.add_argument("--dry-run", action="store_true")
     return parser
+
+
+def _default_scorer_payload() -> dict[str, dict[str, object]]:
+    return {
+        "substring": score_to_json_dict(scorer_name="SubStringScorer", score=None),
+        "self_ask_true_false": score_to_json_dict(scorer_name="SelfAskTrueFalseScorer", score=None),
+        "self_ask_scale": score_to_json_dict(scorer_name="SelfAskScaleScorer", score=None),
+        "scale_threshold_0_7": score_to_json_dict(scorer_name="FloatScaleThresholdScorer", score=None),
+        "refusal": score_to_json_dict(scorer_name="SelfAskRefusalScorer", score=None),
+        "compliance_inverted_refusal": score_to_json_dict(
+            scorer_name="TrueFalseInverterScorer", score=None
+        ),
+    }
 
 
 async def run_baseline_suite_async(
@@ -235,18 +249,7 @@ async def run_baseline_suite_async(
                     )
 
                 if not scorer_json:
-                    scorer_json = {
-                        "substring": score_to_json_dict(scorer_name="SubStringScorer", score=None),
-                        "self_ask_true_false": score_to_json_dict(scorer_name="SelfAskTrueFalseScorer", score=None),
-                        "self_ask_scale": score_to_json_dict(scorer_name="SelfAskScaleScorer", score=None),
-                        "scale_threshold_0_7": score_to_json_dict(
-                            scorer_name="FloatScaleThresholdScorer", score=None
-                        ),
-                        "refusal": score_to_json_dict(scorer_name="SelfAskRefusalScorer", score=None),
-                        "compliance_inverted_refusal": score_to_json_dict(
-                            scorer_name="TrueFalseInverterScorer", score=None
-                        ),
-                    }
+                    scorer_json = _default_scorer_payload()
 
                 case_counter += 1
                 export_per_scorer_case_reports(
@@ -302,18 +305,7 @@ async def run_baseline_suite_async(
                         "dataset": chosen_dataset or "none",
                         "seed_group": seed_group_name,
                         "error": "baseline_prompt_failed",
-                        "scores": {
-                            "substring": score_to_json_dict(scorer_name="SubStringScorer", score=None),
-                            "self_ask_true_false": score_to_json_dict(scorer_name="SelfAskTrueFalseScorer", score=None),
-                            "self_ask_scale": score_to_json_dict(scorer_name="SelfAskScaleScorer", score=None),
-                            "scale_threshold_0_7": score_to_json_dict(
-                                scorer_name="FloatScaleThresholdScorer", score=None
-                            ),
-                            "refusal": score_to_json_dict(scorer_name="SelfAskRefusalScorer", score=None),
-                            "compliance_inverted_refusal": score_to_json_dict(
-                                scorer_name="TrueFalseInverterScorer", score=None
-                            ),
-                        },
+                        "scores": _default_scorer_payload(),
                     }
                 )
                 failed += 1
@@ -362,15 +354,11 @@ def main() -> None:
     parser = _build_parser()
     args = parser.parse_args()
 
-    def _tokens(values: list[str]) -> set[str] | None:
-        flat = {t.strip() for v in values for t in v.split(",") if t.strip()}
-        return flat or None
-
     asyncio.run(
         run_baseline_suite_async(
-            selected_scenario_ids=_tokens(args.scenarios),
-            selected_dataset_names=_tokens(args.datasets),
-            selected_scorers=_tokens(args.scorers),
+            selected_scenario_ids=parse_token_set(args.scenarios),
+            selected_dataset_names=parse_token_set(args.datasets),
+            selected_scorers=parse_token_set(args.scorers),
             max_seeds=args.max_seeds,
             dry_run=bool(args.dry_run),
         )
