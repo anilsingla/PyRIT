@@ -43,22 +43,26 @@ The GUI will open at: `http://localhost:8501`
 
 ## Starting the GUI in Docker
 
-From the repository root:
+> The unified container setup in `docker-compose.yaml` does not start the GUI automatically.
+> Use the **Optional GUI workflow** section in [docker_setup.md](docker_setup.md#7-optional-gui-workflow-for-analysis) which explains how to add a GUI service that mounts the same repo and accesses the same SQLite database.
 
+The key points from that guide:
+- Mount `../../:/workspace` so the GUI container sees the same database path as the evaluator.
+- Set `PYRIT_SQLITE_DB_PATH` to the same value as the evaluator container.
+- Expose port `8501`.
+
+Then start the GUI service:
 ```bash
-cd docker/
-docker-compose up pyrit-gui
+docker compose -f samples/security-evaluator/docker-compose.yaml up -d gui
 ```
 
 GUI available at: `http://localhost:8501`
 
-**Share host Ollama with container:**
-
-Edit `docker-compose.yaml`:
+**Share host Ollama with the GUI container:**
 
 ```yaml
 services:
-  pyrit-gui:
+  gui:
     environment:
       OLLAMA_ENDPOINT: http://host.docker.internal:11434/v1
 ```

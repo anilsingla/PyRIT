@@ -1,5 +1,13 @@
 #!/usr/bin/env python3
-"""Import scorer_outputs.json rows into PyRIT SQLite memory as Score records."""
+"""
+Optional utility: Import scorer_outputs.json rows into PyRIT SQLite memory as Score records.
+
+This script is only needed if you want to use the optional PyRIT GUI to browse results
+interactively. The unified container workflow stores results as JSON/CSV and does not
+require this import step.
+
+See: docs/setup/gui_setup.md
+"""
 
 from __future__ import annotations
 

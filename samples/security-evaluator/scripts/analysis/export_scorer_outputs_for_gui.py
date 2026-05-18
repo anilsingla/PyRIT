@@ -1,5 +1,13 @@
 #!/usr/bin/env python3
-"""Export scorer report artifacts for GUI import on another machine."""
+"""
+Optional utility: Export scorer report artifacts for GUI import on another machine.
+
+This script is only needed if you want to use the optional PyRIT GUI on a different
+machine from where the red-team script ran. The unified container workflow does not
+require this script.
+
+See: docs/setup/gui_data_transfer.md
+"""
 
 from __future__ import annotations
 

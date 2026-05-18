@@ -171,6 +171,57 @@ Open notebooks under `doc/` or `samples/security-evaluator/` and run with the sa
 
 Use JupyterLab for interactive analysis of run artifacts, scoring results, and case reports.
 
+## 7) Optional GUI workflow for analysis
+
+> Optional
+>
+> Use this only if you want a separate graphical analysis interface. The unified container quick start does not require it.
+
+The PyRIT GUI reads the same SQLite database file that the evaluator run writes to on the host. That means the GUI can show your results as long as it points to the same `.db` file.
+
+### How the SQLite database is accessible to the GUI
+
+1. The evaluator writes to `samples/security-evaluator/reports/pyrit_ollama_demo.db` on the host.
+2. The GUI must either run on the same machine and mount the same repository folder, or receive a copy of that `.db` file.
+3. The GUI should use the same `PYRIT_SQLITE_DB_PATH` value, or point to the copied database file on the GUI host.
+4. Because SQLite is a single file, the GUI can open the database directly without a separate database server.
+
+### Option A: GUI on the same machine
+
+If you want the GUI on the same host, keep the repository mounted and use the same database path:
+
+```yaml
+services:
+  gui:
+    image: python:3.11-slim
+    working_dir: /workspace/doc/code
+    volumes:
+      - ../../:/workspace
+    environment:
+      PYRIT_SQLITE_DB_PATH: /workspace/samples/security-evaluator/reports/pyrit_ollama_demo.db
+      OLLAMA_ENDPOINT: http://host.docker.internal:11434/v1
+```
+
+### Option B: GUI on a different host
+
+If the GUI runs somewhere else, copy the database file first and then point the GUI to that copied file:
+
+```bash
+scp samples/security-evaluator/reports/pyrit_ollama_demo.db user@gui-host:/tmp/pyrit_ollama_demo.db
+```
+
+Then set the GUI database path on the analysis host:
+
+```bash
+export PYRIT_SQLITE_DB_PATH=/tmp/pyrit_ollama_demo.db
+python pyrit_gui.py
+```
+
+### When to use the GUI
+
+- Use the unified container for the normal evaluator workflow and JupyterLab analysis.
+- Use the GUI only when you want a visual browser-based review of the same SQLite-backed reports.
+
 ## 7) Step-by-step install for a new Docker user
 
 Follow this exact order:

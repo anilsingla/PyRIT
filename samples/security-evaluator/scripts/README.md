@@ -138,13 +138,15 @@ This generates:
 
 ### Phase 3: Analyze Results
 
-**Option A: GUI (recommended)**
+**Option A: Command-line / notebook analysis** (primary)
+
+**Option B: GUI analysis** *(optional — not required by the unified container workflow)*
 ```bash
 cd ../docs/setup
 # Follow gui_setup.md to launch PyRIT GUI
 ```
 
-**Option B: Command-line analysis**
+**Option C: Command-line analysis**
 ```bash
 cd ../analysis
 
@@ -196,8 +198,8 @@ python scripts/helper/verification/smoke_test_runner.py
 |--------|---------|-------|
 | `analyze_json_reports.py` | Batch analysis of per-case JSON reports | `python analysis/analyze_json_reports.py --input-dir ../../reports/cases` |
 | `query_sqlite_database.py` | Direct SQLite database queries without GUI | `python analysis/query_sqlite_database.py --query count` |
-| `import_scorer_json_to_memory.py` | Import scorer JSON into PyRIT memory for GUI | `python analysis/import_scorer_json_to_memory.py --input-json ../../reports/scorer_outputs.json` |
-| `import_json_helper.py` | Fallback manual JSON importer (if primary unavailable) | `python analysis/import_json_helper.py --input ../../reports/scorer_outputs.json` |
+| `import_scorer_json_to_memory.py` | *(optional)* Import scorer JSON into PyRIT SQLite memory for GUI analysis | `python analysis/import_scorer_json_to_memory.py --input-json ../../reports/scorer_outputs.json` |
+| `import_json_helper.py` | *(optional)* Fallback manual JSON importer for GUI SQLite import (if primary unavailable) | `python analysis/import_json_helper.py --input ../../reports/scorer_outputs.json` |
 
 **Common Workflows**:
 
@@ -374,8 +376,8 @@ See: `../docs/setup/README.md`
 
 ### Analysis Issues
 - **Analyze script shows "no reports found"**: Check `reports/cases/` directory exists
-- **Database query shows empty results**: Run importer: `python analysis/import_scorer_json_to_memory.py`
-- **Import fails**: Use fallback: `python analysis/import_json_helper.py`
+- **Database query shows empty results** *(only relevant if using optional GUI)*: Run importer: `python analysis/import_scorer_json_to_memory.py`
+- **Import fails** *(only relevant if using optional GUI)*: Use fallback: `python analysis/import_json_helper.py`
 
 ---
 

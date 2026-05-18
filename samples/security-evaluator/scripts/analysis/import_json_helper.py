@@ -1,6 +1,10 @@
 #!/usr/bin/env python3
 """
-Helper script to import PyRIT scorer JSON reports into SQLite database manually.
+Optional utility: Helper script to import PyRIT scorer JSON reports into SQLite database manually.
+
+This script is only needed if you want to use the optional PyRIT GUI and the primary
+import script (import_scorer_json_to_memory.py) is not available or not working.
+The unified container workflow does not require this step.
 
 This script provides an alternative import method if import_scorer_json_to_memory.py
 is not available or not working properly.

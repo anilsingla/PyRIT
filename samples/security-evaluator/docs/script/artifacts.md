@@ -56,7 +56,7 @@ reports/redteam/datasets__airt_illegal__harmbench/scorers__self_ask_true_false__
 1. Run `--dry-run` first.
 2. Run `baseline` for a simple control result.
 3. Run `redteam` for the main workflow.
-4. Open the GUI or the HTML report.
+4. Open the HTML report; optionally open the GUI (see [GUI Tutorial](../setup/gui_setup.md) for import steps).
 5. Use the run-specific folder under `reports/` and its `cases/` subfolder for deeper analysis.
 
 ## Related docs

@@ -108,8 +108,8 @@ Generated outputs are under:
 - `reports/cases/` (per-case hierarchical reports)
 - `logs/` (runtime logs)
 
-Use GUI for interactive analysis:
-- [docs/setup/gui_setup.md](docs/setup/gui_setup.md)
+Optionally, use the GUI for interactive analysis (see the Optional section in [docker_setup.md](docs/setup/docker_setup.md) for how it accesses the same SQLite database):
+- [docs/setup/gui_setup.md](docs/setup/gui_setup.md) *(optional)*
 
 Understand the output files first:
 - [docs/script/artifacts.md](docs/script/artifacts.md)

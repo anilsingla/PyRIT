@@ -282,6 +282,6 @@ See [Usage Guide](../../docs/script/usage_guide.md) for a complete list.
 
 - Run the sample red-team script: `python scripts/app/main.py`
 - Read the [Quickstart](../../docs/script/quickstart.md)
-- Explore [GUI setup](gui_setup.md) for visual analysis
+- *(Optional)* Explore [GUI setup](gui_setup.md) for interactive visual analysis
 
 
