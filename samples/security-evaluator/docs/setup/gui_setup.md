@@ -1,5 +1,9 @@
 # PyRIT GUI Tutorial
 
+> Advanced / Optional
+>
+> This page covers the optional graphical interface workflow. The unified container quick start does not require the GUI.
+
 Set up and use the PyRIT graphical interface for interactive red-team analysis.
 
 ## What is the PyRIT GUI?

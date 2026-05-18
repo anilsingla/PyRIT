@@ -32,22 +32,19 @@ protect against prompt injection attacks.
 
 ## Visual Architecture Diagram
 
-This diagram shows how the host machine, Docker containers, database, and Ollama server interact in the security evaluator setup. The host mounts the repo into the container, which runs PyRIT CLI, CoPyRIT GUI, and JupyterLab. All tools share the same SQLite database file and communicate with the Ollama server for LLM inference.
+This diagram shows how the host machine, the unified Docker container, the database, and Ollama server interact in the security evaluator setup. The host mounts the repo into the container, which runs the PyRIT CLI and JupyterLab. Both use the same SQLite database file and communicate with the Ollama server for LLM inference.
 
 ```mermaid
 flowchart TD
-    A[User Machine / Host] -->|Volume Mount| B[/Docker Container: PyRIT & CoPyRIT/]
+    A[User Machine / Host] -->|Volume Mount| B[/Unified Security Evaluator Container/]
     B --> C[PyRIT CLI]
-    B --> D[CoPyRIT GUI (Streamlit)]
-    B --> E[JupyterLab]
-    B --> F[Shared SQLite DB (reports/pyrit_ollama_demo.db)]
+    B --> D[JupyterLab]
+    B --> E[Shared SQLite DB (reports/pyrit_ollama_demo.db)]
     C --> F
-    D --> F
-    E --> F
+    D --> E
     A --> G[Ollama Server]
     C --> G
     D --> G
-    E --> G
     subgraph Docker Compose
       B
     end
@@ -55,7 +52,7 @@ flowchart TD
 
 ## Config Loading and Data Flow
 
-This diagram illustrates how configuration files (`.env.local` and `.pyrit_config`) are loaded into the backend, how environment variables are set, and how the attack runner produces artifacts and reports that are then analyzed by the GUI or Jupyter, ultimately presenting results to the user.
+This diagram illustrates how configuration files (`.env.local` and `.pyrit_config`) are loaded into the backend, how environment variables are set, and how the attack runner produces artifacts and reports that are then analyzed in Jupyter or downstream reporting tools, ultimately presenting results to the user.
 
 ```mermaid
 flowchart LR
@@ -66,7 +63,7 @@ flowchart LR
     end
     D -->|provides| E[Attack Runner]
     E -->|writes| F[Artifacts/Reports]
-    F -->|analyzed by| G[GUI/Jupyter]
+    F -->|analyzed by| G[JupyterLab]
     G -->|shows| H[User]
 ```
 
@@ -178,6 +175,6 @@ flowchart TD
       D --> F[Artifacts/Reports]
       E --> F
     end
-    F --> G[GUI/Jupyter]
+    F --> G[JupyterLab]
     G --> H[User]
 ```

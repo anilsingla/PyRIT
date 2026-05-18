@@ -1,7 +1,7 @@
 # PyRIT Docker Setup & Configuration
 
 Run PyRIT in Docker while keeping Ollama on your host machine.
-This guide includes Docker installation, container setup for CoPyRIT (core PyRIT runtime) and Jupyter, and a beginner-friendly end-to-end flow.
+This guide includes Docker installation, a unified container setup for PyRIT + evaluator commands + JupyterLab, and a beginner-friendly end-to-end flow.
 
 ## Architecture
 
@@ -14,11 +14,12 @@ This guide includes Docker installation, container setup for CoPyRIT (core PyRIT
 |                 |                                   |
 |                 | bridge/host-gateway networking    |
 |                 v                                   |
-| +--------+ +--------+ +-------+ |
-| | CoPyRIT| | Jupyter| | GUI   | |
-| | shell  | | Lab    | | 8501  | |
-| | runtime| | 8888   | |       | |
-| +--------+ +--------+ +-------+ |
+| +-----------------------------------------------+   |
+| | Unified Security Evaluator Container          |   |
+| | PyRIT CLI + evaluator commands                |   |
+| | JupyterLab on 8888                            |   |
+| | Shared repo mount + SQLite database           |   |
+| +-----------------------------------------------+   |
 +-----------------------------------------------------+
 ```
 
@@ -88,67 +89,39 @@ ollama list
 curl http://localhost:11434/api/tags
 ```
 
-## 3) Use the provided Docker setup for CoPyRIT, Jupyter, and GUI
+## 3) Use the provided Docker setup for the unified runtime
 
 This repository now includes a ready-to-use compose file at `samples/security-evaluator/docker-compose.yaml`.
 
-Default services in that file:
+Default service in that file:
 
-- `copyrit`: core runtime container for security-evaluator commands
-- `jupyter`: notebook container for analysis at port `8888`
-- `gui`: CoPyRIT GUI (PyRIT Streamlit app) for interactive analysis at port `8501`
+- `copyrit`: unified runtime container for evaluator commands and JupyterLab
 
 If you want to customize it, start from this baseline:
 
 ```yaml
 services:
   copyrit:
-    image: python:3.11-slim
+    build:
+      context: .
+      dockerfile: Dockerfile.pyrit-copyrit-quick
     container_name: security-evaluator-copyrit
     working_dir: /workspace
-    command: bash -lc "pip install --upgrade pip pyrit jupyterlab && tail -f /dev/null"
-    volumes:
-      - ../../:/workspace
-    environment:
-      OLLAMA_ENDPOINT: http://host.docker.internal:11434/v1
-      OLLAMA_TARGET_MODEL: llama3.2
-      OLLAMA_ATTACKER_MODEL: mistral
-      OLLAMA_TF_SCORER_MODEL: llama3.2
-      OLLAMA_SCALE_SCORER_MODEL: llama3.2
-      OLLAMA_REFUSAL_SCORER_MODEL: llama3.2
-      PYRIT_SQLITE_DB_PATH: /workspace/samples/security-evaluator/reports/pyrit_ollama_demo.db
-      ARTIFACTS_ROOT_PATH: /workspace/samples/security-evaluator/reports
-      LOGS_ROOT_PATH: /workspace/samples/security-evaluator/logs
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
-
-  jupyter:
-    image: python:3.11-slim
-    container_name: security-evaluator-jupyter
-    working_dir: /workspace
-    command: bash -lc "pip install --upgrade pip pyrit jupyterlab && jupyter lab --ip=0.0.0.0 --port=8888 --no-browser --allow-root"
+    command: bash -lc "jupyter lab --ip=0.0.0.0 --port=8888 --no-browser --allow-root & tail -f /dev/null"
     ports:
       - "8888:8888"
     volumes:
       - ../../:/workspace
     environment:
       OLLAMA_ENDPOINT: http://host.docker.internal:11434/v1
+      OLLAMA_TARGET_MODEL: llama3.2
+      OLLAMA_ATTACKER_MODEL: mistral
+      OLLAMA_TF_SCORER_MODEL: phi3
+      OLLAMA_SCALE_SCORER_MODEL: llama2
+      OLLAMA_REFUSAL_SCORER_MODEL: mistral
       PYRIT_SQLITE_DB_PATH: /workspace/samples/security-evaluator/reports/pyrit_ollama_demo.db
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
-
-  gui:
-    image: python:3.11-slim
-    container_name: security-evaluator-gui
-    working_dir: /workspace/doc/code
-    command: bash -lc "pip install --upgrade pip pyrit streamlit && streamlit run pyrit_gui.py --server.port=8501 --server.address=0.0.0.0"
-    ports:
-      - "8501:8501"
-    volumes:
-      - ../../:/workspace
-    environment:
-      OLLAMA_ENDPOINT: http://host.docker.internal:11434/v1
-      PYRIT_SQLITE_DB_PATH: /workspace/samples/security-evaluator/reports/pyrit_ollama_demo.db
+      ARTIFACTS_ROOT_PATH: /workspace/samples/security-evaluator/reports
+      LOGS_ROOT_PATH: /workspace/samples/security-evaluator/logs
     extra_hosts:
       - "host.docker.internal:host-gateway"
 ```
@@ -164,11 +137,11 @@ docker compose -f samples/security-evaluator/docker-compose.yaml up -d
 docker compose -f samples/security-evaluator/docker-compose.yaml ps
 ```
 
-Expected: all three services (`copyrit`, `jupyter`, `gui`) are `Up`.
+Expected: the single `copyrit` service is `Up` and JupyterLab is reachable on port `8888`.
 
-## 5) Configure and run security-evaluator in CoPyRIT container
+## 5) Configure and run security-evaluator in the unified container
 
-Enter runtime container:
+Enter the unified runtime container:
 
 ```bash
 docker compose -f samples/security-evaluator/docker-compose.yaml exec copyrit bash
@@ -186,7 +159,7 @@ python scripts/app/main.py --attack-mode baseline
 
 Artifacts are written under `samples/security-evaluator/reports/` on your host because the repository is volume-mounted.
 
-## 6) Use Jupyter container and CoPyRIT GUI
+## 6) Use JupyterLab in the unified container
 
 Open Jupyter in browser:
 
@@ -196,13 +169,7 @@ http://localhost:8888
 
 Open notebooks under `doc/` or `samples/security-evaluator/` and run with the same mounted workspace.
 
-Open CoPyRIT GUI in browser:
-
-```text
-http://localhost:8501
-```
-
-Use the GUI for interactive analysis of run artifacts, scoring results, and case reports.
+Use JupyterLab for interactive analysis of run artifacts, scoring results, and case reports.
 
 ## 7) Step-by-step install for a new Docker user
 
@@ -215,10 +182,9 @@ Follow this exact order:
 5. Clone PyRIT repository.
 6. Use the provided `samples/security-evaluator/docker-compose.yaml` file.
 7. Run `docker compose -f samples/security-evaluator/docker-compose.yaml up -d`.
-8. Enter CoPyRIT container and run `--dry-run` first.
+8. Enter the unified container and run `--dry-run` first.
 9. Run first real attack (`baseline`).
 10. Open Jupyter at `http://localhost:8888` for notebook-based analysis.
-11. Open CoPyRIT GUI at `http://localhost:8501` for interactive result review.
 
 ## 8) Stopping and cleanup
 
@@ -246,11 +212,6 @@ docker compose -f samples/security-evaluator/docker-compose.yaml rm -f
 - Change mapping from `8888:8888` to `8890:8888`
 - Restart: `docker compose -f samples/security-evaluator/docker-compose.yaml up -d`
 
-### GUI port (8501) already in use
-
-- Change mapping from `8501:8501` to `8502:8501` in the compose file
-- Restart: `docker compose -f samples/security-evaluator/docker-compose.yaml up -d`
-
 ### Permission denied on mounted files (Linux)
 
 - Ensure your user owns repository directory
@@ -259,5 +220,4 @@ docker compose -f samples/security-evaluator/docker-compose.yaml rm -f
 ## Next steps
 
 - Run the red-team sample: see [Quickstart](../script/quickstart.md)
-- Set up GUI analysis: see [GUI Tutorial](gui_setup.md)
 - Review configuration options: see [Usage Guide](../script/usage_guide.md)

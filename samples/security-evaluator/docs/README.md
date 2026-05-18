@@ -8,7 +8,7 @@ Choose your learning path:
 
 New to this package? Start here:
 - [Start Here](../START_HERE.md) — Step-by-step path from first run to advanced modes
-- [Security Evaluator User Guide](./SECURITY_EVALUATOR_USER_GUIDE.md) — full sample walkthrough from install through GUI and report analysis
+- [Security Evaluator User Guide](./SECURITY_EVALUATOR_USER_GUIDE.md) — full sample walkthrough from install through Jupyter-based analysis and reports
 - [Script Quickstart](script/quickstart.md) — run your first red-team scenario
 - [PyRIT Local Setup](./setup/local_setup.md) — install PyRIT and dependencies
 
@@ -19,8 +19,6 @@ Learn how to install, configure, and use PyRIT:
 - **[Security Evaluator User Guide](./SECURITY_EVALUATOR_USER_GUIDE.md)** - central walkthrough for setup, configuration, reports, and attack modes
 - **[Local Installation](./setup/local_setup.md)** - Install PyRIT locally on Linux, macOS, or Windows
 - **[Docker Setup](./setup/docker_setup.md)** - Run PyRIT in containers with host Ollama
-- **[GUI Tutorial](./setup/gui_setup.md)** - Set up and use the PyRIT graphical interface for analysis
-- **[GUI report transfer](./setup/gui_data_transfer.md)** - export/import JSON reports between run hosts and GUI hosts
 - **[Configuration field reference](./script/configuration_fields.md)** - explicit `.env` and `.pyrit_config` field definitions
 - **[Report analysis](./script/report_analysis.md)** - how to interpret generated output files and logs
 
@@ -41,6 +39,13 @@ Everything about `scripts/app/main.py`:
 ### First time?
 Start with [Script Quickstart](script/quickstart.md)
 
+## Optional and Advanced
+
+Use these only if you want the graphical analysis workflow or report transfer between separate hosts.
+
+- **[GUI Tutorial](./setup/gui_setup.md)** - Optional graphical interface for analysis
+- **[GUI report transfer](./setup/gui_data_transfer.md)** - Optional JSON report export/import between hosts
+
 ## Common Workflows
 
 **I want to run a red-team attack:**
@@ -51,8 +56,8 @@ Start with [Script Quickstart](script/quickstart.md)
 **I want to analyze results interactively:**
 1. Run red-team script
 2. [Import scores](script/quickstart.md#analyzing-results)
-3. [Open PyRIT GUI](./setup/gui_setup.md)
-4. Review generated files in [Artifacts and Outputs](script/artifacts.md)
+3. Review generated files in [Artifacts and Outputs](script/artifacts.md)
+4. If needed, use the optional [GUI Tutorial](./setup/gui_setup.md)
 
 **I want to use custom attack prompts:**
 1. Author dataset — see [Custom Datasets](script/custom_dataset_guide.md)
@@ -72,7 +77,7 @@ Use this minimal operational flow for repeatable runs:
 2. Run setup from [Local Installation](./setup/local_setup.md) or [Docker Setup](./setup/docker_setup.md).
 3. Execute the runner script from [Script Quickstart](script/quickstart.md).
 4. Review outputs under `reports/<attack_mode>/<datasets>/<scorers>/<timestamp>/`, `reports/<attack_mode>/<datasets>/<scorers>/<timestamp>/cases/`, and `logs/`.
-5. Optionally import JSON for GUI browsing from [GUI Tutorial](./setup/gui_setup.md).
+5. If you need GUI browsing, use the optional [GUI Tutorial](./setup/gui_setup.md).
 
 Security baseline:
 - Keep `ALLOW_REMOTE_OLLAMA_ENDPOINT=false` unless explicitly required.
@@ -105,7 +110,7 @@ docs/
 **Script hangs or crashes?**
 - See [Script Quickstart / Troubleshooting](script/quickstart.md#troubleshooting)
 
-**GUI won't load data?**
+**Optional GUI won't load data?**
 - See [GUI Tutorial / Troubleshooting](./setup/gui_setup.md#troubleshooting)
 
 **Dataset validation failed?**

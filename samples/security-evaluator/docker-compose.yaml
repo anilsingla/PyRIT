@@ -1,206 +1,24 @@
-version: '3.8'
-
-# ═══════════════════════════════════════════════════════════════════════════════
-# SQLITE DATABASE ARCHITECTURE
-# ═══════════════════════════════════════════════════════════════════════════════
-# 
-# WHERE SQLITE IS ACTUALLY INSTALLED/STORED:
-# └─ HOST MACHINE (not in containers)
-#    File path: <REPO_ROOT>/samples/security-evaluator/reports/pyrit_ollama_demo.db
-#    Example on Windows:
-#      C:\Users\YourUser\Documents\PyRIT\samples\security-evaluator\reports\pyrit_ollama_demo.db
-#    Example on Linux:
-#      /home/youruser/PyRIT/samples/security-evaluator/reports/pyrit_ollama_demo.db
-#
-# HOW CONTAINERS ACCESS IT:
-# ├─ Volume mount: ../../:/workspace (bind host repo root to /workspace inside container)
-# ├─ All containers share SAME PYRIT_SQLITE_DB_PATH env var pointing to same file
-# └─ Python sqlite3 module reads/writes directly to host file via volume mount
-#    (No separate database server needed; OS-level file locking handles concurrency)
-#
-# MULTIPLE CONTAINERS ACCESSING SAME DB:
-# └─ copyrit, jupyter, and gui containers can all read/write simultaneously
-#    because SQLite uses OS-level file locking (journaling mode)
-#    → No conflicts; changes immediately visible across all containers
-#
-# ═══════════════════════════════════════════════════════════════════════════════
+# Unified security-evaluator runtime:
+# PyRIT CLI + JupyterLab run in the same container.
+# The repo is volume-mounted so the evaluator, notebooks, configs, and reports
+# all operate on the same files.
 
 services:
   copyrit:
-    image: python:3.11-slim
-    container_name: security-evaluator-copyrit
-    working_dir: /workspace
-    # Install PyRIT + utilities; container remains idle waiting for CLI commands
-    # SQLite database file: accessed via volume mount (see architecture above)
-    command: >-
-      bash -lc "pip install --upgrade pip pyrit && tail -f /dev/null"
-    volumes:
-      - ../../:/workspace  # Bind host repo → /workspace (SQLite file accessible via PYRIT_SQLITE_DB_PATH)
-    environment:
-      # ─────────────────────────────────────────────────────────────────────
-      # OLLAMA MODEL CONFIGURATION
-      # ─────────────────────────────────────────────────────────────────────
-      OLLAMA_ENDPOINT: http://host.docker.internal:11434/v1
-      OLLAMA_TARGET_MODEL: llama3.2        # Model being tested (red team target)
-      OLLAMA_ATTACKER_MODEL: mistral       # Adversarial attack prompt generator
-      OLLAMA_CONVERTER_MODEL: phi3         # Prompt converter operations
-      OLLAMA_TF_SCORER_MODEL: phi3         # True/false response scorer (distinct)
-      OLLAMA_SCALE_SCORER_MODEL: llama2    # Float-scale response scorer (different model)
-      OLLAMA_REFUSAL_SCORER_MODEL: mistral # Refusal detection scorer (different model)
-      OLLAMA_SCORER_MODEL: phi3            # Fallback generic scorer
-      OLLAMA_MODEL: llama2                 # Optional generic Ollama model
-      ALLOW_REMOTE_OLLAMA_ENDPOINT: "false"
-      
-      # ─────────────────────────────────────────────────────────────────────
-      # SQLITE DATABASE (shared across all containers via volume mount)
-      # ─────────────────────────────────────────────────────────────────────
-      PYRIT_SQLITE_DB_PATH: /workspace/samples/security-evaluator/reports/pyrit_ollama_demo.db
-      
-      # ─────────────────────────────────────────────────────────────────────
-      # OUTPUT AND ARTIFACT PATHS
-      # ─────────────────────────────────────────────────────────────────────
-      ARTIFACTS_ROOT_PATH: /workspace/samples/security-evaluator/reports
-      LOGS_ROOT_PATH: /workspace/samples/security-evaluator/logs
-      SCORER_COMPARISON_CSV_PATH: /workspace/samples/security-evaluator/reports/scorer_comparison.csv
-      SCORER_OUTPUTS_JSON_PATH: /workspace/samples/security-evaluator/reports/scorer_outputs.json
-      BATCH_SCORER_CHECK_JSON_PATH: /workspace/samples/security-evaluator/reports/batch_scorer_check.json
-      RUN_REPORT_JSON_PATH: /workspace/samples/security-evaluator/reports/run_report.json
-      REPORTS_ROOT_PATH: /workspace/samples/security-evaluator/reports/cases
-      
-      # ─────────────────────────────────────────────────────────────────────
-      # RUNTIME BEHAVIOR
-      # ─────────────────────────────────────────────────────────────────────
-      DEBUG: "false"
-      ALLOW_RUNTIME_PIP_INSTALL: "false"
-      PYRIT_MAX_TURNS: "4"
-      PRINT_DATASET_SEEDS: "false"
-      DATASET_PREVIEW_ROWS: "3"
-      EXPORT_DETAILED_SCORES_JSON: "true"
-      RUN_ALL_AVAILABLE_DATASETS: "false"
-      MAX_DATASETS_PER_SCENARIO: "0"
-      OLLAMA_MAX_RETRIES_PER_SCENARIO: "3"
-      OLLAMA_RETRY_WAIT_SECONDS: "5"
-      RESUME_INCOMPLETE_RUN: "true"
-      
-      # ─────────────────────────────────────────────────────────────────────
-      # ATTACK MODE PARAMETERS (TAP)
-      # ─────────────────────────────────────────────────────────────────────
-      TAP_WIDTH: "3"
-      TAP_BRANCHING_FACTOR: "2"
-      TAP_DEPTH: "5"
-      
-      # ─────────────────────────────────────────────────────────────────────
-      # ATTACK MODE PARAMETERS (Crescendo)
-      # ─────────────────────────────────────────────────────────────────────
-      CRESCENDO_MAX_BACKTRACKS: "5"
-      CRESCENDO_MAX_TURNS: "10"
-      
-      # ─────────────────────────────────────────────────────────────────────
-      # ATTACK MODE PARAMETERS (Baseline)
-      # ─────────────────────────────────────────────────────────────────────
-      BASELINE_MAX_SEEDS: "0"
-      BASELINE_REPORT_PATH: /workspace/samples/security-evaluator/reports/baseline_scan_report.json
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
-
-  jupyter:
-    image: python:3.11-slim
-    container_name: security-evaluator-jupyter
-    working_dir: /workspace
-    # Install PyRIT + Jupyter Lab for notebook-based analysis
-    # SQLite database file: accessed via volume mount (see architecture above)
-    command: >-
-      bash -lc "pip install --upgrade pip pyrit jupyterlab && jupyter lab --ip=0.0.0.0 --port=8888 --no-browser --allow-root"
-    ports:
-      - "8888:8888"  # Jupyter Lab web interface
-    volumes:
-      - ../../:/workspace  # Bind host repo → /workspace (SQLite file accessible via PYRIT_SQLITE_DB_PATH)
-    environment:
-      # ─────────────────────────────────────────────────────────────────────
-      # OLLAMA MODEL CONFIGURATION
-      # ─────────────────────────────────────────────────────────────────────
-      OLLAMA_ENDPOINT: http://host.docker.internal:11434/v1
-      OLLAMA_TARGET_MODEL: llama3.2
-      OLLAMA_ATTACKER_MODEL: mistral
-      OLLAMA_CONVERTER_MODEL: phi3
-      OLLAMA_TF_SCORER_MODEL: phi3
-      OLLAMA_SCALE_SCORER_MODEL: llama2
-      OLLAMA_REFUSAL_SCORER_MODEL: mistral
-      OLLAMA_SCORER_MODEL: phi3
-      OLLAMA_MODEL: llama2
-      ALLOW_REMOTE_OLLAMA_ENDPOINT: "false"
-      
-      # ─────────────────────────────────────────────────────────────────────
-      # SQLITE DATABASE (shared across all containers)
-      # Same file as copyrit container; changes visible in real-time
-      # ─────────────────────────────────────────────────────────────────────
-      PYRIT_SQLITE_DB_PATH: /workspace/samples/security-evaluator/reports/pyrit_ollama_demo.db
-      
-      # ─────────────────────────────────────────────────────────────────────
-      # OUTPUT AND ARTIFACT PATHS
-      # ─────────────────────────────────────────────────────────────────────
-      ARTIFACTS_ROOT_PATH: /workspace/samples/security-evaluator/reports
-      LOGS_ROOT_PATH: /workspace/samples/security-evaluator/logs
-      SCORER_COMPARISON_CSV_PATH: /workspace/samples/security-evaluator/reports/scorer_comparison.csv
-      SCORER_OUTPUTS_JSON_PATH: /workspace/samples/security-evaluator/reports/scorer_outputs.json
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
-
-  gui:
-    image: python:3.11-slim
-    container_name: security-evaluator-gui
-    working_dir: /workspace/doc/code
-    # Install PyRIT + Streamlit for interactive GUI analysis
-    # SQLite database file: accessed via volume mount (see architecture above)
-    command: >-
-      bash -lc "pip install --upgrade pip pyrit streamlit && streamlit run pyrit_gui.py --server.port=8501 --server.address=0.0.0.0"
-    ports:
-      - "8501:8501"  # CoPyRIT GUI web interface
-    volumes:
-      - ../../:/workspace  # Bind host repo → /workspace (SQLite file accessible via PYRIT_SQLITE_DB_PATH)
-    environment:
-      # ─────────────────────────────────────────────────────────────────────
-      # OLLAMA MODEL CONFIGURATION
-      # ─────────────────────────────────────────────────────────────────────
-      OLLAMA_ENDPOINT: http://host.docker.internal:11434/v1
-      OLLAMA_TARGET_MODEL: llama3.2
-      OLLAMA_ATTACKER_MODEL: mistral
-      OLLAMA_CONVERTER_MODEL: phi3
-      OLLAMA_TF_SCORER_MODEL: phi3
-      OLLAMA_SCALE_SCORER_MODEL: llama2
-      OLLAMA_REFUSAL_SCORER_MODEL: mistral
-      OLLAMA_SCORER_MODEL: phi3
-      OLLAMA_MODEL: llama2
-      ALLOW_REMOTE_OLLAMA_ENDPOINT: "false"
-      
-      # ─────────────────────────────────────────────────────────────────────
-      # SQLITE DATABASE (shared across all containers)
-      # Same file as copyrit and jupyter containers
-      # ─────────────────────────────────────────────────────────────────────
-      PYRIT_SQLITE_DB_PATH: /workspace/samples/security-evaluator/reports/pyrit_ollama_demo.db
-      
-      # ─────────────────────────────────────────────────────────────────────
-      # OUTPUT AND ARTIFACT PATHS
-      # ─────────────────────────────────────────────────────────────────────
-      ARTIFACTS_ROOT_PATH: /workspace/samples/security-evaluator/reports
-      LOGS_ROOT_PATH: /workspace/samples/security-evaluator/logs
-      SCORER_COMPARISON_CSV_PATH: /workspace/samples/security-evaluator/reports/scorer_comparison.csv
-      SCORER_OUTPUTS_JSON_PATH: /workspace/samples/security-evaluator/reports/scorer_outputs.json
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
-
-pyrit-copyrit-quick:
     build:
       context: .
       dockerfile: Dockerfile.pyrit-copyrit-quick
-    container_name: pyrit-copyrit-quick
+    image: pyrit-copyrit-quick:latest
+    container_name: security-evaluator-copyrit
     working_dir: /workspace
+    command: >-
+      bash -lc "jupyter lab --ip=0.0.0.0 --port=8888 --no-browser --allow-root & tail -f /dev/null"
     ports:
-      - "8888:8888"   # JupyterLab
-      - "8501:8501"   # Streamlit GUI
+      - "8888:8888"  # JupyterLab web interface
     volumes:
-      - ../../:/workspace
+      - ../../:/workspace  # Bind the repo into the unified runtime container
     environment:
+      # OLLAMA model configuration
       OLLAMA_ENDPOINT: http://host.docker.internal:11434/v1
       OLLAMA_TARGET_MODEL: llama3.2
       OLLAMA_ATTACKER_MODEL: mistral
@@ -211,7 +29,11 @@ pyrit-copyrit-quick:
       OLLAMA_SCORER_MODEL: phi3
       OLLAMA_MODEL: llama2
       ALLOW_REMOTE_OLLAMA_ENDPOINT: "false"
+
+      # Shared SQLite database path on the host mount.
       PYRIT_SQLITE_DB_PATH: /workspace/samples/security-evaluator/reports/pyrit_ollama_demo.db
+
+      # Output and artifact paths.
       ARTIFACTS_ROOT_PATH: /workspace/samples/security-evaluator/reports
       LOGS_ROOT_PATH: /workspace/samples/security-evaluator/logs
       SCORER_COMPARISON_CSV_PATH: /workspace/samples/security-evaluator/reports/scorer_comparison.csv
@@ -219,6 +41,8 @@ pyrit-copyrit-quick:
       BATCH_SCORER_CHECK_JSON_PATH: /workspace/samples/security-evaluator/reports/batch_scorer_check.json
       RUN_REPORT_JSON_PATH: /workspace/samples/security-evaluator/reports/run_report.json
       REPORTS_ROOT_PATH: /workspace/samples/security-evaluator/reports/cases
+
+      # Runtime behavior.
       DEBUG: "false"
       ALLOW_RUNTIME_PIP_INSTALL: "false"
       PYRIT_MAX_TURNS: "4"
@@ -230,6 +54,8 @@ pyrit-copyrit-quick:
       OLLAMA_MAX_RETRIES_PER_SCENARIO: "3"
       OLLAMA_RETRY_WAIT_SECONDS: "5"
       RESUME_INCOMPLETE_RUN: "true"
+
+      # Attack mode parameters.
       TAP_WIDTH: "3"
       TAP_BRANCHING_FACTOR: "2"
       TAP_DEPTH: "5"
@@ -237,5 +63,6 @@ pyrit-copyrit-quick:
       CRESCENDO_MAX_TURNS: "10"
       BASELINE_MAX_SEEDS: "0"
       BASELINE_REPORT_PATH: /workspace/samples/security-evaluator/reports/baseline_scan_report.json
+
     extra_hosts:
       - "host.docker.internal:host-gateway"

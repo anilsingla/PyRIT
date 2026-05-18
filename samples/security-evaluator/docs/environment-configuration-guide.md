@@ -258,48 +258,53 @@ silent: false
 
 ---
 
-## Docker Compose Environment
+### Docker Compose Environment
 
 When running in Docker, environment variables are set in `docker-compose.yaml`:
 
 ```yaml
-services:
-  copyrit:
-    environment:
-      # OLLAMA Models
-      OLLAMA_ENDPOINT: http://host.docker.internal:11434/v1
-      OLLAMA_TARGET_MODEL: llama3.2
-      OLLAMA_ATTACKER_MODEL: mistral
-      OLLAMA_CONVERTER_MODEL: phi3
-      OLLAMA_TF_SCORER_MODEL: phi3
-      OLLAMA_SCALE_SCORER_MODEL: phi3
-      OLLAMA_REFUSAL_SCORER_MODEL: phi3
-      OLLAMA_SCORER_MODEL: phi3
-      OLLAMA_MODEL: llama2
-      ALLOW_REMOTE_OLLAMA_ENDPOINT: "false"
-      
-      # SQLite
-      PYRIT_SQLITE_DB_PATH: /workspace/samples/security-evaluator/reports/pyrit_ollama_demo.db
-      
-      # Output Paths
-      ARTIFACTS_ROOT_PATH: /workspace/samples/security-evaluator/reports
-      LOGS_ROOT_PATH: /workspace/samples/security-evaluator/logs
-      SCORER_COMPARISON_CSV_PATH: /workspace/samples/security-evaluator/reports/scorer_comparison.csv
-      SCORER_OUTPUTS_JSON_PATH: /workspace/samples/security-evaluator/reports/scorer_outputs.json
-      
-      # Runtime
-      DEBUG: "false"
-      ALLOW_RUNTIME_PIP_INSTALL: "false"
-      PYRIT_MAX_TURNS: "4"
-      RESUME_INCOMPLETE_RUN: "true"
-      
-      # Attack Modes
-      TAP_WIDTH: "3"
-      TAP_BRANCHING_FACTOR: "2"
-      TAP_DEPTH: "5"
-      CRESCENDO_MAX_BACKTRACKS: "5"
-      CRESCENDO_MAX_TURNS: "10"
-      BASELINE_MAX_SEEDS: "0"
+  services:
+    copyrit:
+      build:
+        context: .
+        dockerfile: Dockerfile.pyrit-copyrit-quick
+      ports:
+        - "8888:8888"
+      environment:
+        # OLLAMA Models
+        OLLAMA_ENDPOINT: http://host.docker.internal:11434/v1
+        OLLAMA_TARGET_MODEL: llama3.2
+        OLLAMA_ATTACKER_MODEL: mistral
+        OLLAMA_CONVERTER_MODEL: phi3
+        OLLAMA_TF_SCORER_MODEL: phi3
+        OLLAMA_SCALE_SCORER_MODEL: llama2
+        OLLAMA_REFUSAL_SCORER_MODEL: mistral
+        OLLAMA_SCORER_MODEL: phi3
+        OLLAMA_MODEL: llama2
+        ALLOW_REMOTE_OLLAMA_ENDPOINT: "false"
+
+        # SQLite
+        PYRIT_SQLITE_DB_PATH: /workspace/samples/security-evaluator/reports/pyrit_ollama_demo.db
+
+        # Output Paths
+        ARTIFACTS_ROOT_PATH: /workspace/samples/security-evaluator/reports
+        LOGS_ROOT_PATH: /workspace/samples/security-evaluator/logs
+        SCORER_COMPARISON_CSV_PATH: /workspace/samples/security-evaluator/reports/scorer_comparison.csv
+        SCORER_OUTPUTS_JSON_PATH: /workspace/samples/security-evaluator/reports/scorer_outputs.json
+
+        # Runtime
+        DEBUG: "false"
+        ALLOW_RUNTIME_PIP_INSTALL: "false"
+        PYRIT_MAX_TURNS: "4"
+        RESUME_INCOMPLETE_RUN: "true"
+
+        # Attack Modes
+        TAP_WIDTH: "3"
+        TAP_BRANCHING_FACTOR: "2"
+        TAP_DEPTH: "5"
+        CRESCENDO_MAX_BACKTRACKS: "5"
+        CRESCENDO_MAX_TURNS: "10"
+        BASELINE_MAX_SEEDS: "0"
 ```
 
 **Key difference**: Paths in Docker use absolute paths starting with `/workspace/` (volume mount destination), not relative paths.
@@ -328,7 +333,7 @@ python scripts/app/main.py --attack-mode baseline --dry-run
 # 1. Start containers (env vars in docker-compose.yaml)
 docker-compose -f samples/security-evaluator/docker-compose.yaml up -d
 
-# 2. Enter copyrit container
+# 2. Enter the unified container
 docker-compose -f samples/security-evaluator/docker-compose.yaml exec copyrit bash
 
 # 3. Inside container, env vars are already set
@@ -389,29 +394,28 @@ AZURE_OPENAI_DEPLOYMENT=gpt-4o
 
 ---
 
-## Quick Setup: PyRIT & CoPyRIT Combined Docker Image
+## Quick Setup: Unified PyRIT Docker Image
 
-A single Docker image for rapid evaluation and demo of both PyRIT and CoPyRIT (JupyterLab + Streamlit GUI) is provided.
+A single Docker image for rapid evaluation and demo of PyRIT evaluator commands and JupyterLab is provided.
 
 ### Build the Image
 
 ```bash
 cd samples/security-evaluator
-# Build the combined image
-docker compose build pyrit-copyrit-quick
+# Build the unified image
+docker compose build copyrit
 ```
 
 ### Run the Container
 
 ```bash
-# Start the container (JupyterLab on 8888, Streamlit GUI on 8501)
-docker compose up pyrit-copyrit-quick
+# Start the container (JupyterLab on 8888)
+docker compose up copyrit
 ```
 
 - JupyterLab: http://localhost:8888
-- CoPyRIT Streamlit GUI: http://localhost:8501
 
-The container includes all environment variables and mounts the repo for full access to data and scripts.
+The container includes all environment variables and mounts the repo for full access to data, scripts, and reports.
 
 ---
 
@@ -426,11 +430,11 @@ flowchart LR
     end
     D -->|provides| E[Attack Runner]
     E -->|writes| F[Artifacts/Reports]
-    F -->|analyzed by| G[GUI/Jupyter]
+    F -->|analyzed by| G[JupyterLab]
     G -->|shows| H[User]
 ```
 
-This diagram shows the flow from configuration files to backend, runner, and reporting/GUI.
+This diagram shows the flow from configuration files to the backend, runner, and JupyterLab analysis.
 
 ---
 
@@ -473,7 +477,7 @@ flowchart TD
       D --> F[Artifacts/Reports]
       E --> F
     end
-    F --> G[GUI/Jupyter]
+    F --> G[JupyterLab]
     G --> H[User]
 ```
 
@@ -548,13 +552,13 @@ extra_hosts:
 
 ## Visual Architecture Diagram
 
-This diagram shows how the host machine, Docker containers, database, and Ollama server interact in the security evaluator setup. The host mounts the repo into the container, which runs PyRIT CLI, CoPyRIT GUI, and JupyterLab. All tools share the same SQLite database file and communicate with the Ollama server for LLM inference.
+This diagram shows how the host machine, the unified Docker container, the SQLite database, and the Ollama server interact in the security evaluator setup. The host mounts the repo into the container, which runs PyRIT CLI and JupyterLab. Both share the same SQLite database file and communicate with the Ollama server for LLM inference.
 
 ---
 
 ## Config Loading and Data Flow
 
-This diagram illustrates how configuration files (`.env.local` and `.pyrit_config`) are loaded into the backend, how environment variables are set, and how the attack runner produces artifacts and reports that are then analyzed by the GUI or Jupyter, ultimately presenting results to the user.
+This diagram illustrates how configuration files (`.env.local` and `.pyrit_config`) are loaded into the backend, how environment variables are set, and how the attack runner produces artifacts and reports that are then analyzed in Jupyter or by downstream reporting tools, ultimately presenting results to the user.
 
 ---
 
@@ -570,4 +574,4 @@ All modes converge on report generation and analysis.
 
 ## Plugin Architecture (Extensibility)
 
-This diagram shows how PyRIT can be extended with custom attack and scorer plugins. The core loads plugins, which feed into the attack runner and scoring engine. Results are written to artifacts/reports, which are then visualized in the GUI or Jupyter for the user.
+This diagram shows how PyRIT can be extended with custom attack and scorer plugins. The core loads plugins, which feed into the attack runner and scoring engine. Results are written to artifacts/reports, which are then visualized in JupyterLab or exported for further review.

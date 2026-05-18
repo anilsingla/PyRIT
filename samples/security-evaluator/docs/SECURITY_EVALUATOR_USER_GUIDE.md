@@ -14,8 +14,8 @@ It collects the critical user-facing documentation for setup, configuration, att
 7. [Attack mode selection and tuning](#7-advanced-tests-and-attack-types)
 8. [Execute all datasets tests](#8-execute-all-datasets-tests)
 9. [Custom dataset authoring](#9-custom-dataset-authoring)
-10. [PyRIT GUI setup](#10-pyrit-gui-setup)
-11. [Export/import reports for GUI analysis](#11-export-and-import-reports-for-gui-analysis)
+10. [Optional PyRIT GUI setup](#10-optional-pyrit-gui-setup)
+11. [Optional export/import reports for GUI analysis](#11-optional-export-and-import-reports-for-gui-analysis)
 12. [HTML, CSV, and raw JSON analysis](#12-html-csv-and-raw-json-analysis)
 13. [Best practices & common patterns](#13-best-practices--common-patterns)
 14. [Troubleshooting](#13-troubleshooting)
@@ -30,7 +30,7 @@ Use these documents together to understand the sample and the PyRIT platform.
 - [Start Here](../START_HERE.md) — step-by-step sample flow from first run to advanced attacks.
 - [Local installation](./setup/local_setup.md) — install dependencies on Windows, Linux, or macOS.
 - [Docker setup](./setup/docker_setup.md) — run PyRIT inside Docker with host Ollama support.
-- [GUI tutorial](./setup/gui_setup.md) — run the PyRIT analysis GUI locally or in Docker.
+- [GUI tutorial](./setup/gui_setup.md) — optional analysis interface for local or Docker use.
 - [Complete usage reference](./script/usage_guide.md) — environment variables, options, and feature descriptions.
 - [Configuration field reference](./script/configuration_fields.md) — `.env` and `.pyrit_config` fields with explanations.
 - [Quickstart](./script/quickstart.md) — the fastest way to run a simple sample execution.
@@ -519,7 +519,9 @@ Read the full instructions here:
 
 - [Custom dataset guide](./script/custom_dataset_guide.md)
 
-## 10. PyRIT GUI setup
+## 10. Optional PyRIT GUI setup
+
+This section is optional. The unified container workflow does not require the GUI.
 
 ### Local GUI setup
 
@@ -555,7 +557,9 @@ On Linux, replace `host.docker.internal` with the host gateway IP.
 
 See: [GUI tutorial](./setup/gui_setup.md)
 
-## 11. Export and import reports for GUI analysis
+## 11. Optional export and import reports for GUI analysis
+
+Use these steps only if you want to move results into the optional GUI workflow.
 
 The recommended portable artifact for GUI analysis is `reports/scorer_outputs.json`.
 If the run happens on a different host than the GUI, copy that JSON file to the GUI machine
@@ -830,7 +834,7 @@ Primary documentation sources:
 - [PyRIT repo docs index](https://github.com/Azure/PyRIT/blob/main/doc/README.md)
 - [Local installation guide](./setup/local_setup.md)
 - [Docker setup guide](./setup/docker_setup.md)
-- [PyRIT GUI tutorial](./setup/gui_setup.md)
+- [PyRIT GUI tutorial](./setup/gui_setup.md) (optional)
 - [Complete sample usage reference](./script/usage_guide.md)
 
 For sample-specific run details, use the guide links above and the central

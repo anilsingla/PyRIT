@@ -212,13 +212,7 @@ docker-compose.yaml:
 │     environment:                                                │
 │       PYRIT_SQLITE_DB_PATH: /workspace/samples/.../pyrit...db   │
 │                                                                 │
-│   jupyter:                                                      │
-│     volumes:                                                    │
-│       - ../../:/workspace  ← SAME VOLUME MOUNT                  │
-│     environment:                                                │
-│       PYRIT_SQLITE_DB_PATH: /workspace/samples/.../pyrit...db   │
-│                                                                 │
-│   gui:                                                          │
+│   unified runtime:                                              │
 │     volumes:                                                    │
 │       - ../../:/workspace  ← SAME VOLUME MOUNT                  │
 │     environment:                                                │
@@ -243,36 +237,30 @@ HOST FILESYSTEM                      CONTAINER FILESYSTEM
 **Key Points:**
 
 - **Volume mount** `../../:/workspace` binds the host repo root to `/workspace` inside the container
-- Both host and containers access the **same database file** on the host disk
+- The host and the unified container access the **same database file** on the host disk
 - **No copying**, **no synchronization** - direct access to host filesystem
-- Multiple containers simultaneously access the same `.db` file safely (SQLite file locking)
+- SQLite file locking keeps access safe if you also open the same file from host-side tools
 
-### HOW MULTIPLE CONTAINERS SHARE ONE DATABASE
+### HOW THE UNIFIED CONTAINER USES ONE DATABASE
 
-All three containers (copyrit, jupyter, gui) in `docker-compose.yaml`:
+The unified security-evaluator container in `docker-compose.yaml`:
 
-1. Share the **same volume mount** → `/workspace`
-2. Have the **same environment variable** → `PYRIT_SQLITE_DB_PATH=/workspace/.../pyrit_ollama_demo.db`
-3. Access the **same host file** → no duplication
-4. Use **SQLite's file locking** → safe concurrent access
+1. Shares the **same volume mount** → `/workspace`
+2. Uses the **same environment variable** → `PYRIT_SQLITE_DB_PATH=/workspace/.../pyrit_ollama_demo.db`
+3. Accesses the **same host file** → no duplication
+4. Uses **SQLite's file locking** → safe access if you open the database from multiple host-side tools
 
 ```
 ┌──────────────────────────────────────────────────────┐
 │ docker-compose up -d                                 │
 ├──────────────────────────────────────────────────────┤
 │                                                      │
-│  copyrit container    jupyter container    gui      │
-│  ├─ mounts ../../     ├─ mounts ../../      container│
-│  ├─ sets DB_PATH     ├─ sets DB_PATH     ├─ mounts │
-│  │  to /workspace     │  to /workspace    │  ../../  │
-│  │  .../pyrit...db    │  .../pyrit...db   ├─ sets   │
-│  │                    │                   │  DB_PATH │
-│  └─→ FILE A          └─→ FILE A          │ to same  │
-│      (on host)           (on host)       │  path    │
-│                                          └─→ FILE A │
-│                                             (on host)│
+│  unified container                                   │
+│  ├─ mounts ../../                                    │
+│  ├─ sets DB_PATH to /workspace/.../pyrit...db        │
+│  └─→ FILE A (on host)                                │
 │                                                      │
-│  All see: Same host database file                    │
+│  JupyterLab + evaluator commands use the same file   │
 │  SQLite prevents conflicts via file locking          │
 │                                                      │
 └──────────────────────────────────────────────────────┘
@@ -319,9 +307,9 @@ bash samples/security-evaluator/scripts/installers/verify_sqlite_volume_mount.sh
 
 This script verifies:
 - Database file exists on host
-- Docker containers can access the same file
+- The unified container can access the same file
 - File checksums match (same file, not copied)
-- Multi-container sharing works
+- Host and container are reading the same database
 
 ### TROUBLESHOOTING
 
@@ -336,7 +324,7 @@ This script verifies:
 - **Check:** SQLite uses OS-level file locking; conflicts should be rare
 
 **Different database content in container vs host:**
-- **Cause:** Likely running different database files or old container images
+- **Cause:** Likely running different database files or an outdated container image
 - **Solution:**
   - Verify `PYRIT_SQLITE_DB_PATH` environment variable in compose file
   - Ensure containers are stopped/rebuilt: `docker-compose down && docker-compose build`

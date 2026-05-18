@@ -1,5 +1,9 @@
 # PyRIT GUI Report Export / Import
 
+> Advanced / Optional
+>
+> Use this workflow only when the run host and GUI host are different machines. The unified container quick start does not require report transfer.
+
 This guide explains how to move generated PyRIT report data from one machine to another and import it into the PyRIT GUI for interactive analysis.
 
 ## When to use this
