@@ -23,7 +23,10 @@ Optional environment variables (fall back to OPENAI_* values if not set):
 import asyncio
 import inspect
 import os
+import sys
 import httpx
+from datetime import datetime
+from pathlib import Path
 
 from pyrit.datasets import SeedDatasetProvider
 from pyrit.executor.attack import (
@@ -35,6 +38,59 @@ from pyrit.executor.attack import (
 from pyrit.prompt_target import OpenAIChatTarget
 from pyrit.score import SelfAskScaleScorer, SelfAskTrueFalseScorer, TrueFalseQuestion
 from pyrit.setup import SQLITE, initialize_pyrit_async
+
+
+# ============================================================================
+# LOGGING AND OUTPUT CAPTURE SYSTEM
+# ============================================================================
+class DualWriter:
+    """Writes output to both console and log file simultaneously."""
+    def __init__(self, file_path):
+        self.file_handle = open(file_path, 'w', encoding='utf-8', buffering=1)
+        self.console = sys.stdout
+        self.is_closed = False
+
+    def write(self, message):
+        # Write to console (screen) immediately
+        self.console.write(message)
+        self.console.flush()
+        
+        # Also write to file
+        self.file_handle.write(message)
+        self.file_handle.flush()
+
+    def flush(self):
+        self.console.flush()
+        if not self.is_closed:
+            self.file_handle.flush()
+
+    def close(self):
+        if not self.is_closed:
+            self.file_handle.close()
+            self.is_closed = True
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *args):
+        self.close()
+
+
+def setup_logging():
+    """Create log file and return dual writer for stdout/stderr redirection."""
+    log_dir = Path("pyrit_reports")
+    log_dir.mkdir(exist_ok=True)
+    
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    log_file = log_dir / f"banking_security_test_{timestamp}.log"
+    
+    # Print to screen first to confirm logging is starting
+    sys.stdout.write(f"📋 Log file created: {log_file.absolute()}\n")
+    sys.stdout.write(f"📋 Both screen and log outputs are being captured...\n\n")
+    sys.stdout.flush()
+    
+    return DualWriter(log_file)
+
 
 
 # ============================================================================
@@ -1308,6 +1364,15 @@ Banking Threat: {seed.value}""",
 
 # Entry point: Run the async main function with graceful error handling
 if __name__ == "__main__":
+    # Setup logging to capture all output to both screen and file
+    dual_writer = setup_logging()
+    original_stdout = sys.stdout
+    original_stderr = sys.stderr
+    
+    # Redirect both stdout and stderr to the dual writer
+    sys.stdout = dual_writer
+    sys.stderr = dual_writer
+    
     try:
         # Execute the Banking Security Crescendo attack orchestration
         asyncio.run(run_banking_crescendo_async())
@@ -1333,4 +1398,13 @@ if __name__ == "__main__":
         print(f"! Message: {str(e)}")
         print(f"! Exiting gracefully...")
         print(f"{'!'*80}\n")
+    
+    finally:
+        # Restore original stdout/stderr and close log file
+        sys.stdout = original_stdout
+        sys.stderr = original_stderr
+        dual_writer.close()
+        print("✓ All results saved to log file in pyrit_reports/ directory")
+
+
  
