@@ -252,6 +252,31 @@ Expected result: Generates `reports/baseline_scan_report.json`, `scorer_outputs.
 
 Typical runtime: 5-15 minutes depending on model size and dataset count.
 
+### Targeted runner smoke matrix
+
+Use this matrix after code changes to quickly validate each standalone runner entrypoint.
+
+```bash
+python scripts/app/attacks/crescendo_attack_runner.py --scenarios LLM01 --dry-run
+python scripts/app/attacks/tap_attack_runner.py --scenarios LLM01 --dry-run
+python scripts/app/attacks/redteam_attack_runner.py --converters base64 --dry-run
+python scripts/app/attacks/xpia_attack_runner.py --scenarios LLM02 --dry-run
+python scripts/app/attacks/baseline_scan_runner.py --scenarios LLM01 --dry-run
+python scripts/app/attacks/batch_rescore_runner.py --dry-run
+```
+
+Expected behavior:
+- Dry-run confirms argument parsing and execution planning.
+- No prompts are sent and no live attacks run.
+- If runtime attack modules are missing in your environment, runners exit gracefully and print a clear missing module message (for example `No module named 'pyrit.executor'`).
+
+Live run prerequisite:
+- For real attack execution (non-dry-run), install the full PyRIT runtime components that provide `pyrit.executor`.
+
+Output controls (environment flags):
+- `ENABLE_WAIT_SPINNER=true|false` controls spinner display while waiting for long async steps.
+- `ENABLE_LIVE_SCORER_FEED=true|false` controls streaming per-scorer results as each scorer completes.
+
 For details: [Quickstart](./script/quickstart.md)
 
 ## 6. Reports generated and significance

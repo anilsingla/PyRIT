@@ -72,7 +72,15 @@ try:
     )
     from redteam_runner.cli_utils import parse_token_set
     from scorer import print_detailed_scorer_outputs, validate_scorer_keys
-    from utils.output_tools import Colors, print_banner, print_divider, print_scorer_comparison, setup_logging
+    from utils.output_tools import (
+        ENABLE_LIVE_SCORER_FEED,
+        Colors,
+        await_with_spinner,
+        print_banner,
+        print_divider,
+        print_scorer_comparison,
+        setup_logging,
+    )
 except ModuleNotFoundError as exc:
     RUNTIME_IMPORT_ERROR = exc
 
@@ -212,13 +220,16 @@ async def run_tap_suite_async(
 
         start_time = time.monotonic()
         try:
-            result = await attack.execute_async(
-                objective=scenario.objective,
-                memory_labels={
-                    "owasp_id": scenario.owasp_id,
-                    "attack_mode": "tap",
-                    "dataset": chosen_dataset or "none",
-                },
+            result = await await_with_spinner(
+                label=f"TAP {scenario.owasp_id}",
+                awaitable=attack.execute_async(
+                    objective=scenario.objective,
+                    memory_labels={
+                        "owasp_id": scenario.owasp_id,
+                        "attack_mode": "tap",
+                        "dataset": chosen_dataset or "none",
+                    },
+                ),
             )
             elapsed = time.monotonic() - start_time
 
@@ -227,6 +238,12 @@ async def run_tap_suite_async(
             conversation = memory.get_message_pieces(conversation_id=result.conversation_id)
             last_text = extract_last_assistant_text(conversation=conversation)
             if last_text.strip():
+                async def _live_scorer_callback(scorer_key: str, score) -> None:
+                    if not ENABLE_LIVE_SCORER_FEED:
+                        return
+                    score_value = str(getattr(score, "score_value", "n/a")) if score is not None else "n/a"
+                    print(f"  {Colors.DIM}[live scorer]{Colors.RESET} {scorer_key} = {Colors.WHITE}{score_value}{Colors.RESET}")
+
                 comparison, comparison_json = await run_scorer_comparison_async(
                     response_text=last_text,
                     objective=scenario.objective,
@@ -234,6 +251,7 @@ async def run_tap_suite_async(
                     scale_scorer_target=scale_scorer_target,
                     refusal_scorer_target=refusal_scorer_target,
                     selected_scorers=selected_scorers,
+                    live_callback=_live_scorer_callback,
                 )
                 weighted_metrics = compute_weighted_agreement_metrics(comparison=comparison)
                 print_scorer_comparison(comparison=comparison, title="TAP SCORER OUTPUT")

@@ -92,6 +92,30 @@ For the security evaluator sample, use the dedicated user guide at [samples/secu
    python samples/security-evaluator/scripts/helper/generate_markdown_report.py
    ```
 
+## Security Evaluator Smoke Matrix
+
+Run this quick matrix from repo root after changing runner code:
+
+```bash
+python samples/security-evaluator/scripts/app/attacks/crescendo_attack_runner.py --scenarios LLM01 --dry-run
+python samples/security-evaluator/scripts/app/attacks/tap_attack_runner.py --scenarios LLM01 --dry-run
+python samples/security-evaluator/scripts/app/attacks/redteam_attack_runner.py --converters base64 --dry-run
+python samples/security-evaluator/scripts/app/attacks/xpia_attack_runner.py --scenarios LLM02 --dry-run
+python samples/security-evaluator/scripts/app/attacks/baseline_scan_runner.py --scenarios LLM01 --dry-run
+python samples/security-evaluator/scripts/app/attacks/batch_rescore_runner.py --dry-run
+```
+
+Expected results:
+- Dry-run parser and planning paths complete for each runner.
+- No live attacks run and no prompts are sent.
+- If runtime modules are unavailable, runners fail gracefully with a clear dependency message (for example missing `pyrit.executor`).
+
+Output toggles:
+- `ENABLE_WAIT_SPINNER=true|false` controls wait spinner visibility.
+- `ENABLE_LIVE_SCORER_FEED=true|false` controls per-scorer streaming output.
+
+For the full walkthrough, see `samples/security-evaluator/docs/SECURITY_EVALUATOR_USER_GUIDE.md`.
+
 ## Example .env.local
 ```ini
 OLLAMA_ENDPOINT=http://localhost:11434/v1

@@ -49,7 +49,7 @@ try:
         initialize_pyrit_async,
         validate_ollama_endpoint,
     )
-    from utils.output_tools import Colors, print_banner, print_divider
+    from utils.output_tools import Colors, await_with_spinner, print_banner, print_divider
 except ModuleNotFoundError as exc:
     RUNTIME_IMPORT_ERROR = exc
 
@@ -165,7 +165,10 @@ async def run_xpia_suite_async(*, selected_scenario_ids: set[str] | None, dry_ru
 
         start_time = time.monotonic()
         try:
-            xpia_result = await xpia_workflow.execute_async(context=context)
+            xpia_result = await await_with_spinner(
+                label=f"XPIA {scenario.owasp_id}",
+                awaitable=xpia_workflow.execute_async(context=context),
+            )
             elapsed = time.monotonic() - start_time
             status = str(xpia_result.status.value)
             status_colored = (

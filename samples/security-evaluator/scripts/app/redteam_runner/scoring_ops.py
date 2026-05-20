@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import asyncio
+import inspect
 from collections.abc import Sequence
 
 from scorer import build_run_flags, resolve_requested_scorers
@@ -172,6 +174,7 @@ async def run_scorer_comparison_async(
     scale_scorer_target: OpenAIChatTarget,
     refusal_scorer_target: OpenAIChatTarget,
     selected_scorers: set[str] | None = None,
+    live_callback=None,
 ) -> tuple[dict[str, str], dict[str, dict[str, object]]]:
     """Run multiple scorers on one response and return normalized outputs."""
     message = Message(
@@ -211,16 +214,49 @@ async def run_scorer_comparison_async(
     run_refusal = run_flags["run_refusal"]
     run_compliance = run_flags["run_compliance"]
 
-    substring_result = (await substring_scorer.score_async(message=message, objective=objective))[0] if run_substring else None
-    tf_result = (await tf_scorer.score_async(message=message, objective=objective))[0] if run_tf else None
-    scale_result = (await scale_scorer.score_async(message=message, objective=objective))[0] if run_scale else None
-    threshold_result = (
-        (await threshold_scorer.score_async(message=message, objective=objective))[0] if run_threshold else None
-    )
-    refusal_result = (await refusal_scorer.score_async(message=message, objective=objective))[0] if run_refusal else None
-    compliance_result = (
-        (await compliance_scorer.score_async(message=message, objective=objective))[0] if run_compliance else None
-    )
+    async def _emit_live(name: str, score: Score | None) -> None:
+        if live_callback is None:
+            return
+        try:
+            callback_result = live_callback(name, score)
+            if inspect.isawaitable(callback_result):
+                await callback_result
+        except Exception:
+            debug_log(message=f"Live scorer callback failed for {name}")
+
+    async def _score_one(name: str, scorer) -> tuple[str, Score | None]:
+        try:
+            score = (await scorer.score_async(message=message, objective=objective))[0]
+        except Exception:
+            score = None
+        await _emit_live(name=name, score=score)
+        return name, score
+
+    tasks: list[asyncio.Task] = []
+    if run_substring:
+        tasks.append(asyncio.create_task(_score_one("substring", substring_scorer)))
+    if run_tf:
+        tasks.append(asyncio.create_task(_score_one("self_ask_true_false", tf_scorer)))
+    if run_scale:
+        tasks.append(asyncio.create_task(_score_one("self_ask_scale", scale_scorer)))
+    if run_threshold:
+        tasks.append(asyncio.create_task(_score_one("scale_threshold_0_7", threshold_scorer)))
+    if run_refusal:
+        tasks.append(asyncio.create_task(_score_one("refusal", refusal_scorer)))
+    if run_compliance:
+        tasks.append(asyncio.create_task(_score_one("compliance_inverted_refusal", compliance_scorer)))
+
+    score_map: dict[str, Score | None] = {}
+    for done in asyncio.as_completed(tasks):
+        name, score = await done
+        score_map[name] = score
+
+    substring_result = score_map.get("substring")
+    tf_result = score_map.get("self_ask_true_false")
+    scale_result = score_map.get("self_ask_scale")
+    threshold_result = score_map.get("scale_threshold_0_7")
+    refusal_result = score_map.get("refusal")
+    compliance_result = score_map.get("compliance_inverted_refusal")
 
     comparison_values: dict[str, str] = {}
     comparison_json: dict[str, dict[str, object]] = {}

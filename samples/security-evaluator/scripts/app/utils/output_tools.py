@@ -1,5 +1,8 @@
 # Utility for dual output and color formatting
+import asyncio
+import os
 import sys
+import time
 from datetime import datetime
 from pathlib import Path
 
@@ -23,6 +26,18 @@ class Colors:
     HEADER = f'{CYAN}{BOLD}{UNDERLINE}'
 
 
+def _env_flag(name: str, default: bool) -> bool:
+    """Parse common true/false environment flag values."""
+    raw = os.getenv(name)
+    if raw is None:
+        return default
+    return raw.strip().lower() in {"1", "true", "yes", "on"}
+
+
+ENABLE_WAIT_SPINNER = _env_flag("ENABLE_WAIT_SPINNER", True)
+ENABLE_LIVE_SCORER_FEED = _env_flag("ENABLE_LIVE_SCORER_FEED", True)
+
+
 def print_banner(*, title: str, width: int = 66) -> None:
     """Print a consistent section banner with color styling."""
     print(f"\n{Colors.HEADER}{'#' * width}{Colors.RESET}")
@@ -33,6 +48,30 @@ def print_banner(*, title: str, width: int = 66) -> None:
 def print_divider(*, width: int = 66) -> None:
     """Print a subtle cyan divider line."""
     print(f"{Colors.CYAN}{'─' * width}{Colors.RESET}")
+
+
+async def await_with_spinner(*, label: str, awaitable):
+    """Await long-running operation while showing a lightweight spinner."""
+    if not ENABLE_WAIT_SPINNER:
+        return await awaitable
+
+    frames = "|/-\\"
+    idx = 0
+    started = time.monotonic()
+    task = asyncio.create_task(awaitable)
+
+    while not task.done():
+        elapsed = time.monotonic() - started
+        print(
+            f"\r{Colors.DIM}  ⏳ {label} {frames[idx % len(frames)]}  {elapsed:5.1f}s{Colors.RESET}",
+            end="",
+            flush=True,
+        )
+        idx += 1
+        await asyncio.sleep(0.2)
+
+    print("\r" + " " * 100 + "\r", end="", flush=True)
+    return await task
 
 
 def _to_bool_or_none(*, value: object) -> bool | None:

@@ -36,11 +36,14 @@ Standalone runner examples:
 python scripts/app/attacks/redteam_attack_runner.py --dry-run
 python scripts/app/attacks/tap_attack_runner.py --scenarios LLM01 --width 3 --depth 5
 python scripts/app/attacks/crescendo_attack_runner.py --scenarios LLM06 --max-backtracks 5
+python scripts/app/attacks/redteam_attack_runner.py --converters base64 --dry-run
 ```
 
 Notes:
 - Standalone TAP/Crescendo/Redteam runners now emit both compact and detailed scorer logs.
 - Standalone runners also write dual screen+file logs via `pyrit_sec_eval_logs/`.
+- Spinner and live scorer feed are configurable via `ENABLE_WAIT_SPINNER` and `ENABLE_LIVE_SCORER_FEED`.
+- In dependency-limited environments, runner `--dry-run` still validates CLI paths and surfaces the missing runtime module clearly.
 
 ## Related docs
 

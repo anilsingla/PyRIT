@@ -78,7 +78,14 @@ try:
     from reports import write_json_report
     from scorer import build_default_scorer_payload
     from pyrit.executor.attack import PromptSendingAttack
-    from utils.output_tools import Colors, print_banner, print_divider, print_scorer_comparison
+    from utils.output_tools import (
+        ENABLE_LIVE_SCORER_FEED,
+        Colors,
+        await_with_spinner,
+        print_banner,
+        print_divider,
+        print_scorer_comparison,
+    )
 except ModuleNotFoundError as exc:
     RUNTIME_IMPORT_ERROR = exc
 
@@ -218,13 +225,16 @@ async def run_baseline_suite_async(
         for prompt_text in seed_prompts:
             start_time = time.monotonic()
             try:
-                result = await attack.execute_async(
-                    objective=prompt_text,
-                    memory_labels={
-                        "owasp_id": scenario.owasp_id,
-                        "attack_mode": "baseline",
-                        "dataset": chosen_dataset or "none",
-                    },
+                result = await await_with_spinner(
+                    label=f"BASELINE {scenario.owasp_id}",
+                    awaitable=attack.execute_async(
+                        objective=prompt_text,
+                        memory_labels={
+                            "owasp_id": scenario.owasp_id,
+                            "attack_mode": "baseline",
+                            "dataset": chosen_dataset or "none",
+                        },
+                    ),
                 )
                 outcome_str = str(result.outcome)
                 prompt_preview = f"{prompt_text[:60]}..."
@@ -241,6 +251,15 @@ async def run_baseline_suite_async(
                     conversation = memory.get_message_pieces(conversation_id=result.conversation_id)
                     last_text = extract_last_assistant_text(conversation=conversation)
                     if last_text.strip():
+                        async def _live_scorer_callback(scorer_key: str, score) -> None:
+                            if not ENABLE_LIVE_SCORER_FEED:
+                                return
+                            score_value = str(getattr(score, "score_value", "n/a")) if score is not None else "n/a"
+                            print(
+                                f"  {Colors.DIM}[live scorer]{Colors.RESET} "
+                                f"{scorer_key} = {Colors.WHITE}{score_value}{Colors.RESET}"
+                            )
+
                         _, scorer_json = await run_scorer_comparison_async(
                             response_text=last_text,
                             objective=scenario.objective,
@@ -248,6 +267,7 @@ async def run_baseline_suite_async(
                             scale_scorer_target=scale_scorer_target,
                             refusal_scorer_target=refusal_scorer_target,
                             selected_scorers=selected_scorers,
+                            live_callback=_live_scorer_callback,
                         )
                 except Exception:
                     _LOG.exception(

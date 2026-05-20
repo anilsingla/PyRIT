@@ -66,6 +66,19 @@ logs/                            ← Production log + checkpoint
 python scripts/app/main.py --dry-run --local-datasets-only
 ```
 
+**Run targeted dry-run smoke checks for each standalone runner:**
+
+```bash
+python scripts/app/attacks/crescendo_attack_runner.py --scenarios LLM01 --dry-run
+python scripts/app/attacks/tap_attack_runner.py --scenarios LLM01 --dry-run
+python scripts/app/attacks/redteam_attack_runner.py --converters base64 --dry-run
+python scripts/app/attacks/xpia_attack_runner.py --scenarios LLM02 --dry-run
+python scripts/app/attacks/baseline_scan_runner.py --scenarios LLM01 --dry-run
+python scripts/app/attacks/batch_rescore_runner.py --dry-run
+```
+
+If your environment does not yet include full attack runtime modules, these commands still validate parser/dry-run paths and report a clear dependency message (for example missing `pyrit.executor`).
+
 **Run the standalone RedTeam runner (dual screen+file logs):**
 
 ```bash
@@ -74,6 +87,10 @@ python scripts/app/attacks/redteam_attack_runner.py --scorers self_ask_true_fals
 ```
 
 Standalone runner logs are written to `pyrit_sec_eval_logs/` while still streaming to the console.
+
+Output behavior toggles:
+- `ENABLE_WAIT_SPINNER=true|false` (default `true`)
+- `ENABLE_LIVE_SCORER_FEED=true|false` (default `true`)
 
 **Test with smaller dataset:**
 

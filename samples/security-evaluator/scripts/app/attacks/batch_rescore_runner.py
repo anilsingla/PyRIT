@@ -60,7 +60,7 @@ try:
     )
     from reports import write_json_report
     from scorer import validate_scorer_keys
-    from utils.output_tools import Colors, print_banner, print_scorer_comparison
+    from utils.output_tools import ENABLE_LIVE_SCORER_FEED, Colors, print_banner, print_scorer_comparison
 except ModuleNotFoundError as exc:
     RUNTIME_IMPORT_ERROR = exc
 
@@ -145,6 +145,12 @@ async def run_batch_rescore_async(
         )
         start_time = time.monotonic()
         try:
+            async def _live_scorer_callback(scorer_key: str, score) -> None:
+                if not ENABLE_LIVE_SCORER_FEED:
+                    return
+                score_value = str(getattr(score, "score_value", "n/a")) if score is not None else "n/a"
+                print(f"    {Colors.DIM}[live scorer]{Colors.RESET} {scorer_key} = {Colors.WHITE}{score_value}{Colors.RESET}")
+
             comparison, scorer_json = await run_scorer_comparison_async(
                 response_text=text,
                 objective=objective,
@@ -152,6 +158,7 @@ async def run_batch_rescore_async(
                 scale_scorer_target=scale_target,
                 refusal_scorer_target=refusal_target,
                 selected_scorers=selected_scorers,
+                live_callback=_live_scorer_callback,
             )
             rescore_rows.append({
                 "conversation_id": str(getattr(piece, "conversation_id", "")),

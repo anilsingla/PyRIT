@@ -60,6 +60,24 @@ def _env_flag(name: str, default: bool) -> bool:
 SHOW_SCORE_OBJECT_DIAGNOSTICS = _env_flag("SHOW_SCORE_OBJECT_DIAGNOSTICS", False)
 ENABLE_WAIT_SPINNER = _env_flag("ENABLE_WAIT_SPINNER", True)
 ENABLE_LIVE_SCORER_FEED = _env_flag("ENABLE_LIVE_SCORER_FEED", True)
+SHOW_LEARNING_LOGS = _env_flag("SHOW_LEARNING_LOGS", True)
+LEARNING_LOG_VERBOSITY = os.getenv("LEARNING_LOG_VERBOSITY", "basic").strip().lower()
+
+
+def _learn_log(section: str, message: str, *, level: str = "basic") -> None:
+    """Print beginner-friendly execution breadcrumbs."""
+    if not SHOW_LEARNING_LOGS:
+        return
+
+    if LEARNING_LOG_VERBOSITY not in {"basic", "detailed"}:
+        effective_verbosity = "basic"
+    else:
+        effective_verbosity = LEARNING_LOG_VERBOSITY
+
+    if level == "detailed" and effective_verbosity != "detailed":
+        return
+
+    print(f"{Colors.DIM}[LEARN][{section}] {message}{Colors.RESET}")
 
 
 # ============================================================================
@@ -88,6 +106,7 @@ class Colors:
 
 def enable_colors_windows():
     """Enable ANSI color support on Windows."""
+    _learn_log("startup", "Enabling ANSI color support for terminal output.")
     try:
         import ctypes
         kernel32 = ctypes.windll.kernel32
@@ -181,6 +200,7 @@ class DualWriter:
 
 def setup_logging():
     """Create log file and return dual writer for stdout/stderr redirection with verification."""
+    _learn_log("logging", "Preparing dual output logging (console + file).")
     log_dir = Path("pyrit_reports")
     log_dir.mkdir(exist_ok=True)
     
@@ -235,6 +255,7 @@ def create_banking_threat_dataset() -> list:
     Returns:
         list: Collection of 50+ BankingThreat objects for comprehensive testing
     """
+    _learn_log("dataset", "Building in-memory banking threat dataset used by test loop.")
     banking_threats = [
         # ===== AUTHENTICATION & AUTHORIZATION (8 tests) =====
         BankingThreat(
@@ -850,6 +871,7 @@ async def _run_scorer_fallback(
     matcher: callable,
 ) -> object | None:
     """Run a scorer directly and return a score-like object compatible with result printers."""
+    _learn_log("scorer-fallback", f"Attempting direct scorer execution for {score_name}.", level="detailed")
     if not response_text:
         return None
 
@@ -945,6 +967,7 @@ async def _run_scorer_fallback(
 
 async def _run_scale_scorer_fallback(scale_scorer: object, objective: str, response_text: str) -> object | None:
     """Run the scale scorer directly when attack result has no persisted float-scale score."""
+    _learn_log("scorer-fallback", "Running dedicated float-scale fallback scorer.")
     return await _run_scorer_fallback(
         scorer=scale_scorer,
         objective=objective,
@@ -957,6 +980,7 @@ async def _run_scale_scorer_fallback(scale_scorer: object, objective: str, respo
 
 async def _await_with_spinner(*, label: str, awaitable) -> object:
     """Show a spinner while awaiting long-running endpoint work."""
+    _learn_log("wait", f"Starting wait phase: {label}", level="detailed")
     if not ENABLE_WAIT_SPINNER:
         return await awaitable
 
@@ -986,6 +1010,7 @@ async def _run_live_scorer_feed_async(
     scorer_specs: list[tuple[str, object, str, str, tuple[str, ...]]],
 ) -> list[object]:
     """Run scorers concurrently and print each result immediately on completion."""
+    _learn_log("live-feed", "Starting concurrent live scorer feed.", level="detailed")
     if not ENABLE_LIVE_SCORER_FEED:
         return []
 
@@ -1047,6 +1072,7 @@ async def _run_live_scorer_feed_async(
 
 def _extract_final_target_response(result: object) -> str:
     """Extract the final text response from the objective (target) model."""
+    _learn_log("extract", "Extracting final target-model response from attack result graph.", level="detailed")
     candidates = []
     all_message_objects = []
 
@@ -1195,6 +1221,7 @@ def _compact_test_summary_line(
 
 def _build_substring_scorer(substring: str) -> object | None:
     """Construct SubStringScorer across PyRIT versions with different init signatures."""
+    _learn_log("compat", "Resolving runtime-compatible SubStringScorer constructor.")
     if SubStringScorer is None:
         return None
 
@@ -1277,6 +1304,7 @@ def _print_score_objects(test_num: int, category: str, objective: str, result: o
     Returns:
         tuple: (numeric_score, is_safe) where numeric_score is 0-100 and is_safe is boolean
     """
+    _learn_log("test", f"Formatting detailed result output for Test #{test_num:02d} ({category}).", level="detailed")
     print(f"\n{Colors.HEADER}{'═'*80}{Colors.RESET}")
     print(f"{Colors.INFO}  🧪 TEST #{test_num}: {category}{Colors.RESET}")
     print(f"{Colors.HEADER}{'═'*80}{Colors.RESET}")
@@ -1717,12 +1745,15 @@ async def run_banking_crescendo_async() -> None:
     4. Execute Crescendo attack for each banking threat with multi-turn capability
     5. Print results including attack success/failure and security assessment
     """
+    _learn_log("main", "Starting banking Crescendo orchestration.")
     # Initialize PyRIT framework - must be called once before attacks
+    _learn_log("main", "Initializing PyRIT memory backend.")
     await initialize_pyrit_async(memory_db_type=SQLITE)
 
     # STEP 1: Load custom banking threat dataset
     # Create banking-specific threats targeting financial application security
     banking_seeds = create_banking_threat_dataset()
+    _learn_log("main", f"Loaded {len(banking_seeds)} planned tests from dataset.")
 
     # Display loaded banking threats summary
     print(f"\n{Colors.INFO}{'='*80}{Colors.RESET}")
@@ -1735,6 +1766,7 @@ async def run_banking_crescendo_async() -> None:
         print(f"  {Colors.DIM}[{i:2d}]{Colors.RESET} {category_color}{threat.harm_categories[0]:<35}{Colors.RESET} {threat.value[:60]}...")
 
     # STEP 2: Configure three distinct OpenAI targets for the attack pipeline
+    _learn_log("main", "Configuring objective, adversarial, and scorer endpoints.")
     print(f"\n{Colors.INFO}{'='*80}{Colors.RESET}")
     print(f"{Colors.INFO}⚙️  CONFIGURING ATTACK TARGETS{Colors.RESET}")
     print(f"{Colors.INFO}{'='*80}{Colors.RESET}")
@@ -1789,6 +1821,7 @@ async def run_banking_crescendo_async() -> None:
     
     try:
         for test_num, seed in enumerate(banking_seeds, 1):
+            _learn_log("loop", f"Preparing Test #{test_num:02d}: {seed.harm_categories[0] if seed.harm_categories else 'unknown'}", level="detailed")
             # Determine test category
             category = _categorize_test(test_num)
             if category not in category_stats:
@@ -1872,6 +1905,7 @@ Banking Threat: {seed.value}""",
 
             # Execute the attack asynchronously and get results
             # This may take time as it involves multiple model calls
+            _learn_log("loop", f"Executing Crescendo attack for Test #{test_num:02d}.", level="detailed")
             result = await _await_with_spinner(
                 label=f"Executing Test #{test_num:02d} against endpoint",
                 awaitable=attack.execute_async(objective=seed.value, memory_labels=labels),
@@ -2006,6 +2040,7 @@ Banking Threat: {seed.value}""",
                 result,
                 extra_score_objects=fallback_scores,
             )
+            _learn_log("loop", f"Completed Test #{test_num:02d} with score={numeric_score:.1f}, safe={is_safe}.", level="detailed")
             
             # Track test result
             test_results.append({
@@ -2058,6 +2093,7 @@ Banking Threat: {seed.value}""",
     fail_rate = (100 * total_failed / total_tests) if total_tests > 0 else 0.0
     
     # Print overall results header
+    _learn_log("summary", "Printing final execution summary and category dashboards.")
     print(f"\n\n{Colors.HEADER}{'='*80}{Colors.RESET}")
     print(f"{Colors.INFO}BANKING SECURITY ASSESSMENT - EXECUTIVE DASHBOARD{Colors.RESET}")
     print(f"{Colors.HEADER}{'='*80}{Colors.RESET}\n")

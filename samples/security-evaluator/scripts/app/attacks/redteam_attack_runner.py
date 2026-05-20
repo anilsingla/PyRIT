@@ -21,7 +21,13 @@ RUNTIME_IMPORT_ERROR: ModuleNotFoundError | None = None
 
 try:
     # Dual output and color tools
-    from utils.output_tools import Colors, print_scorer_comparison, setup_logging
+    from utils.output_tools import (
+        ENABLE_LIVE_SCORER_FEED,
+        Colors,
+        await_with_spinner,
+        print_scorer_comparison,
+        setup_logging,
+    )
     from scorer import print_detailed_scorer_outputs
 
     from redteam_runner.converter_ops import build_converter_config, build_ollama_target
@@ -509,7 +515,10 @@ async def run_redteam_suite_async(
             )
 
             try:
-                result = await attack.execute_async(objective=scenario.objective, memory_labels=memory_labels)
+                result = await await_with_spinner(
+                    label=f"REDTEAM {scenario.owasp_id}",
+                    awaitable=attack.execute_async(objective=scenario.objective, memory_labels=memory_labels),
+                )
                 await printer.print_result_async(result=result)
 
                 conversation = memory.get_message_pieces(conversation_id=result.conversation_id)
@@ -518,6 +527,12 @@ async def run_redteam_suite_async(
                 if not last_assistant_text.strip():
                     raise RuntimeError("Ollama returned no valid assistant output for scoring.")
 
+                async def _live_scorer_callback(scorer_key: str, score) -> None:
+                    if not ENABLE_LIVE_SCORER_FEED:
+                        return
+                    score_value = str(getattr(score, "score_value", "n/a")) if score is not None else "n/a"
+                    print(f"  {Colors.DIM}[live scorer]{Colors.RESET} {scorer_key} = {Colors.WHITE}{score_value}{Colors.RESET}")
+
                 comparison, scorer_json = await run_scorer_comparison_async(
                     response_text=last_assistant_text,
                     objective=scenario.objective,
@@ -525,6 +540,7 @@ async def run_redteam_suite_async(
                     scale_scorer_target=scale_scorer_target,
                     refusal_scorer_target=refusal_scorer_target,
                     selected_scorers=selected_scorers,
+                    live_callback=_live_scorer_callback,
                 )
                 weighted_metrics = compute_weighted_agreement_metrics(comparison=comparison)
 
