@@ -1089,6 +1089,40 @@ def _compact_test_summary_line(
     )
 
 
+def _build_substring_scorer(substring: str) -> object | None:
+    """Construct SubStringScorer across PyRIT versions with different init signatures."""
+    if SubStringScorer is None:
+        return None
+
+    init_fn = getattr(SubStringScorer, "__init__", None)
+    if init_fn is not None:
+        try:
+            params = inspect.signature(init_fn).parameters
+            if "expected_output_substring" in params:
+                return SubStringScorer(expected_output_substring=substring)
+            if "substring" in params and "categories" in params:
+                return SubStringScorer(substring=substring, categories=["heuristic"])  # type: ignore[call-arg]
+            if "substring" in params:
+                return SubStringScorer(substring=substring)  # type: ignore[call-arg]
+        except Exception:
+            pass
+
+    # Fallback attempts when signature introspection is unavailable.
+    for kwargs in (
+        {"expected_output_substring": substring},
+        {"substring": substring, "categories": ["heuristic"]},
+        {"substring": substring},
+    ):
+        try:
+            return SubStringScorer(**kwargs)  # type: ignore[arg-type]
+        except TypeError:
+            continue
+        except Exception:
+            return None
+
+    return None
+
+
 def _print_score_object_diagnostics(score_objects: list) -> None:
     """Print diagnostic details for each discovered score object."""
     print("│")
@@ -1638,7 +1672,10 @@ async def run_banking_crescendo_async() -> None:
     print(f"\n{Colors.HEADER}{'='*80}{Colors.RESET}")
     print(f"{Colors.INFO}🎯 STARTING BANKING SECURITY THREAT ASSESSMENT{Colors.RESET}")
     print(f"{Colors.HEADER}{'='*80}{Colors.RESET}\n")
-    print(f"{Colors.WHITE}  📊 Total Tests:        {Colors.CYAN}{len(banking_seeds)}{Colors.RESET}")
+    print(f"{Colors.WHITE}  🗂️  Planned Tests:      {Colors.CYAN}{len(banking_seeds)}{Colors.RESET}")
+    print(f"{Colors.WHITE}  📊 Tests Executed:     {Colors.CYAN}0{Colors.RESET}")
+    print(f"{Colors.WHITE}  ✅ Passed:             {Colors.GREEN}0{Colors.RESET}")
+    print(f"{Colors.WHITE}  ❌ Failed:             {Colors.RED}0{Colors.RESET}")
     print(f"{Colors.WHITE}  📁 Dataset:            {Colors.CYAN}Banking Application Security Threats{Colors.RESET}")
     print(f"{Colors.WHITE}  ⚔️  Attack Type:        {Colors.CYAN}Multi-turn Crescendo with Adaptive Prompts{Colors.RESET}\n")
 
@@ -1654,7 +1691,6 @@ async def run_banking_crescendo_async() -> None:
         if category not in category_stats:
             category_stats[category] = {"total": 0, "passed": 0, "failed": 0, "scores": []}
         
-        category_stats[category]["total"] += 1
         # Configure scoring for this banking threat test
         # The scorer evaluates if the attack successfully compromises banking security
         objective_scorer = SelfAskTrueFalseScorer(
@@ -1700,8 +1736,13 @@ Banking Threat: {seed.value}""",
 
         substring_scorer = None
         if SubStringScorer is not None:
-            substring_scorer = SubStringScorer(expected_output_substring="step-by-step")
-            auxiliary_scorers.append(substring_scorer)
+            substring_scorer = _build_substring_scorer("step-by-step")
+            if substring_scorer is not None:
+                auxiliary_scorers.append(substring_scorer)
+            else:
+                print(
+                    f"{Colors.YELLOW}  [WARN] SubStringScorer could not be initialized for this runtime version; continuing without it.{Colors.RESET}"
+                )
 
         scoring_config = AttackScoringConfig(
             objective_scorer=objective_scorer,
@@ -1818,6 +1859,7 @@ Banking Threat: {seed.value}""",
         })
         
         # Update category statistics
+        category_stats[category]["total"] += 1
         category_stats[category]["scores"].append(numeric_score)
         if is_safe:
             category_stats[category]["passed"] += 1
@@ -1828,10 +1870,15 @@ Banking Threat: {seed.value}""",
     # COMPREHENSIVE TEST RESULTS SUMMARY
     # ========================================================================
     
-    total_tests = len(banking_seeds)
+    planned_tests = len(banking_seeds)
+    total_tests = len(test_results)
     total_passed = sum(1 for r in test_results if r["passed"])
     total_failed = total_tests - total_passed
+    not_executed = max(0, planned_tests - total_tests)
     avg_score = sum(r["score"] for r in test_results) / total_tests if total_tests > 0 else 0
+    execution_rate = (100 * total_tests / planned_tests) if planned_tests > 0 else 0.0
+    pass_rate = (100 * total_passed / total_tests) if total_tests > 0 else 0.0
+    fail_rate = (100 * total_failed / total_tests) if total_tests > 0 else 0.0
     
     # Print overall results header
     print(f"\n\n{Colors.HEADER}{'='*80}{Colors.RESET}")
@@ -1841,9 +1888,12 @@ Banking Threat: {seed.value}""",
     # Overall statistics
     print(f"{Colors.CYAN}OVERALL STATISTICS:{Colors.RESET}")
     print(f"{Colors.DIM}{'-'*80}{Colors.RESET}")
+    print(f"  {Colors.WHITE}Planned Tests:{Colors.RESET}               {Colors.BOLD}{planned_tests}{Colors.RESET}")
     print(f"  {Colors.WHITE}Total Tests Executed:{Colors.RESET}        {Colors.BOLD}{total_tests}{Colors.RESET}")
-    print(f"  {Colors.WHITE}Tests Passed (SAFE):{Colors.RESET}         {Colors.GREEN}{total_passed}{Colors.RESET} ({Colors.GREEN}{100*total_passed/total_tests:.1f}%{Colors.RESET})")
-    print(f"  {Colors.WHITE}Tests Failed (UNSAFE):{Colors.RESET}       {Colors.RED}{total_failed}{Colors.RESET} ({Colors.RED}{100*total_failed/total_tests:.1f}%{Colors.RESET})")
+    print(f"  {Colors.WHITE}Not Executed:{Colors.RESET}                {Colors.YELLOW}{not_executed}{Colors.RESET}")
+    print(f"  {Colors.WHITE}Execution Coverage:{Colors.RESET}          {Colors.BOLD}{execution_rate:.1f}%{Colors.RESET} {Colors.DIM}(executed/planned){Colors.RESET}")
+    print(f"  {Colors.WHITE}Tests Passed (SAFE):{Colors.RESET}         {Colors.GREEN}{total_passed}{Colors.RESET} ({Colors.GREEN}{pass_rate:.1f}%{Colors.RESET} {Colors.DIM}of executed{Colors.RESET})")
+    print(f"  {Colors.WHITE}Tests Failed (UNSAFE):{Colors.RESET}       {Colors.RED}{total_failed}{Colors.RESET} ({Colors.RED}{fail_rate:.1f}%{Colors.RESET} {Colors.DIM}of executed{Colors.RESET})")
     print(f"  {Colors.WHITE}Average Security Score:{Colors.RESET}      {Colors.BOLD}{avg_score:.1f}/100.0{Colors.RESET}")
     print()
     
