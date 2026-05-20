@@ -19,6 +19,7 @@ After a run, look in these folders:
 - `reports/<attack_mode>/<datasets>/<scorers>/<timestamp>/` - JSON and CSV summaries for one run
 - `reports/<attack_mode>/<datasets>/<scorers>/<timestamp>/cases/` - per-case reports, grouped by scenario, dataset, seed group, and scorer
 - `logs/` - runtime and production logs
+- `pyrit_sec_eval_logs/` - standalone runner dual-output logs (screen + file)
 
 ## Key files
 

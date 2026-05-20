@@ -27,6 +27,11 @@ import os
 import sys
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
+# Dual output and color tools
+from utils.output_tools import setup_logging
+
 _LOG = logging.getLogger(__name__)
 
 ATTACK_MODES = ("redteam", "tap", "crescendo", "xpia", "baseline", "rescore", "report")
@@ -283,6 +288,17 @@ REPORT & OUTPUT OPTIONS (report mode only)
   --open
                 Open generated HTML report in browser after generation.
 
+ADDITIONAL AUTO-GENERATED REPORTS
+---------------------------------
+
+  If a run uses all datasets, all scorers, or both, an additional per-run
+  comparison artifact is generated automatically:
+
+    all_selection_comparison_report.json
+
+  This report includes side-by-side dataset and scorer comparison aggregates
+  for that run and is written next to other run artifacts.
+
 TAP-SPECIFIC OPTIONS (--attack-mode tap)
 -----------------------------------------
 
@@ -431,11 +447,27 @@ def main() -> None:
         print_detailed_help()
         sys.exit(0)
 
-    # Now import heavy PyRIT modules (after early-exit checks)
-    from redteam_runner.env_config import configure_runner_logging
-    from redteam_runner.workflow import run_attack_mode_async
+    # Setup dual output and color logging for real execution paths
+    dual_writer = setup_logging()
+    original_stdout = sys.stdout
+    original_stderr = sys.stderr
+    sys.stdout = dual_writer
+    sys.stderr = dual_writer
 
-    configure_runner_logging(level=logging.INFO)
+    # Import workflow after early-exit checks; keep logging robust even if optional runtime deps are unavailable.
+    from redteam_runner.workflow import run_attack_mode_async
+    try:
+      from redteam_runner.env_config import configure_runner_logging
+
+      configure_runner_logging(level=logging.INFO)
+    except Exception:
+      logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+        datefmt="%H:%M:%S",
+        force=True,
+      )
+      _LOG.warning("Falling back to basic logging because redteam env configuration could not be loaded.")
 
     def _env_bool(*, name: str, default: bool) -> bool:
         value = os.getenv(name)
@@ -506,6 +538,11 @@ def main() -> None:
     except Exception:
         _LOG.exception("Runner terminated with an unhandled error")
         sys.exit(1)
+    finally:
+      # Restore original stdout/stderr and close log file
+      sys.stdout = original_stdout
+      sys.stderr = original_stderr
+      dual_writer.close()
 
 
 if __name__ == "__main__":

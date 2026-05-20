@@ -30,6 +30,18 @@ python scripts/app/main.py --attack-mode rescore --scorers self_ask_true_false
 python scripts/app/main.py --attack-mode report --open
 ```
 
+Standalone runner examples:
+
+```bash
+python scripts/app/attacks/redteam_attack_runner.py --dry-run
+python scripts/app/attacks/tap_attack_runner.py --scenarios LLM01 --width 3 --depth 5
+python scripts/app/attacks/crescendo_attack_runner.py --scenarios LLM06 --max-backtracks 5
+```
+
+Notes:
+- Standalone TAP/Crescendo/Redteam runners now emit both compact and detailed scorer logs.
+- Standalone runners also write dual screen+file logs via `pyrit_sec_eval_logs/`.
+
 ## Related docs
 
 - [TAP Attack](tap_attack.md)

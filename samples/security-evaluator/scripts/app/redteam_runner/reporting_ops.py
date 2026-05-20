@@ -4,23 +4,48 @@ from __future__ import annotations
 
 import csv
 import json
+import os
 import re
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from .env_config import (
-    ARTIFACTS_ROOT_PATH,
-    BATCH_SCORER_CHECK_JSON_PATH,
-    PRODUCTION_RUN_CHECKPOINT_PATH,
-    PRODUCTION_RUN_LOG_PATH,
-    REPORTS_ROOT_PATH,
-    RESUME_INCOMPLETE_RUN,
-    RUN_REPORT_JSON_PATH,
-    SCORER_COMPARISON_CSV_PATH,
-    SCORER_OUTPUTS_JSON_PATH,
-    debug_log,
-)
+ARTIFACTS_ROOT_PATH = Path(os.getenv("ARTIFACTS_ROOT_PATH", "reports")).resolve()
+REPORTS_ROOT_PATH = Path(os.getenv("REPORTS_ROOT_PATH", str((ARTIFACTS_ROOT_PATH / "cases").resolve()))).resolve()
+LOGS_ROOT_PATH = Path(os.getenv("LOGS_ROOT_PATH", "logs")).resolve()
+
+BATCH_SCORER_CHECK_JSON_PATH = Path(
+    os.getenv("BATCH_SCORER_CHECK_JSON_PATH", str((ARTIFACTS_ROOT_PATH / "batch_scorer_check.json").resolve()))
+).resolve()
+RUN_REPORT_JSON_PATH = Path(
+    os.getenv("RUN_REPORT_JSON_PATH", str((ARTIFACTS_ROOT_PATH / "run_report.json").resolve()))
+).resolve()
+SCORER_COMPARISON_CSV_PATH = Path(
+    os.getenv("SCORER_COMPARISON_CSV_PATH", str((ARTIFACTS_ROOT_PATH / "scorer_comparison.csv").resolve()))
+).resolve()
+SCORER_OUTPUTS_JSON_PATH = Path(
+    os.getenv("SCORER_OUTPUTS_JSON_PATH", str((ARTIFACTS_ROOT_PATH / "scorer_outputs.json").resolve()))
+).resolve()
+PRODUCTION_RUN_LOG_PATH = Path(
+    os.getenv("PRODUCTION_RUN_LOG_PATH", str((LOGS_ROOT_PATH / "pyrit_owasp_redteam_production.log").resolve()))
+).resolve()
+PRODUCTION_RUN_CHECKPOINT_PATH = Path(
+    os.getenv(
+        "PRODUCTION_RUN_CHECKPOINT_PATH",
+        str((LOGS_ROOT_PATH / "pyrit_owasp_redteam_production_checkpoint.json").resolve()),
+    )
+).resolve()
+RESUME_INCOMPLETE_RUN = os.getenv("RESUME_INCOMPLETE_RUN", "true").strip().lower() in {
+    "1",
+    "true",
+    "yes",
+    "y",
+    "on",
+}
+
+
+def debug_log(*, message: str) -> None:
+    del message
 
 
 def _join_slug_parts(*, values: list[str], empty_label: str) -> str:
@@ -60,6 +85,7 @@ def build_run_report_paths(*, run_root: Path) -> dict[str, Path]:
         "run_report_html": run_root / "run_report.html",
         "run_report_md": run_root / "run_report.md",
         "report_summary_json": run_root / "report_summary.json",
+        "all_selection_comparison_json": run_root / "all_selection_comparison_report.json",
     }
 
 

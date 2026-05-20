@@ -24,51 +24,67 @@ import time
 from pathlib import Path
 from typing import cast
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+_APP_ROOT = Path(__file__).resolve().parents[1]
+_SCRIPTS_ROOT = Path(__file__).resolve().parents[2]
+_REPO_ROOT = Path(__file__).resolve().parents[5]
+for _path in (str(_APP_ROOT), str(_SCRIPTS_ROOT), str(_REPO_ROOT)):
+    if _path not in sys.path:
+        sys.path.insert(0, _path)
 
-from pyrit.executor.attack import (
-    AttackAdversarialConfig,
-    AttackScoringConfig,
-    ConsoleAttackResultPrinter,
-    CrescendoAttack,
-)
-from redteam_runner.converter_ops import build_ollama_target
-from redteam_runner.dataset_ops import build_execution_plan, sync_dataset_to_memory_async
-from redteam_runner.env_config import (
-    CentralMemory,
-    MAX_DATASETS_PER_SCENARIO,
-    MAX_TURNS,
-    OLLAMA_ATTACKER_MODEL,
-    OLLAMA_ENDPOINT,
-    OLLAMA_SCALE_SCORER_MODEL,
-    OLLAMA_TARGET_MODEL,
-    OLLAMA_TF_SCORER_MODEL,
-    OLLAMA_REFUSAL_SCORER_MODEL,
-    OWASPScenario,
-    OWASP_SCENARIOS,
-    RUN_ALL_AVAILABLE_DATASETS,
-    SQLITE,
-    SQLITE_DB_PATH,
-    SeedDataset,
-    SeedDatasetProvider,
-    SelfAskTrueFalseScorer,
-    TrueFalseQuestion,
-    check_ollama_health,
-    configure_runner_logging,
-    initialize_pyrit_async,
-    validate_ollama_endpoint,
-)
-from redteam_runner.scoring_ops import (
-    AVAILABLE_SCORER_KEYS,
-    extract_last_assistant_text,
-    run_scorer_comparison_async,
-)
-from redteam_runner.cli_utils import parse_token_set
+RUNTIME_IMPORT_ERROR: ModuleNotFoundError | None = None
+
+try:
+    from pyrit.executor.attack import (
+        AttackAdversarialConfig,
+        AttackScoringConfig,
+        ConsoleAttackResultPrinter,
+        CrescendoAttack,
+    )
+    from redteam_runner.converter_ops import build_ollama_target
+    from redteam_runner.dataset_ops import build_execution_plan, sync_dataset_to_memory_async
+    from redteam_runner.env_config import (
+        CentralMemory,
+        MAX_DATASETS_PER_SCENARIO,
+        MAX_TURNS,
+        OLLAMA_ATTACKER_MODEL,
+        OLLAMA_ENDPOINT,
+        OLLAMA_SCALE_SCORER_MODEL,
+        OLLAMA_TARGET_MODEL,
+        OLLAMA_TF_SCORER_MODEL,
+        OLLAMA_REFUSAL_SCORER_MODEL,
+        OWASPScenario,
+        OWASP_SCENARIOS,
+        RUN_ALL_AVAILABLE_DATASETS,
+        SQLITE,
+        SQLITE_DB_PATH,
+        SeedDataset,
+        SeedDatasetProvider,
+        SelfAskTrueFalseScorer,
+        TrueFalseQuestion,
+        check_ollama_health,
+        configure_runner_logging,
+        initialize_pyrit_async,
+        validate_ollama_endpoint,
+    )
+    from redteam_runner.scoring_ops import (
+        AVAILABLE_SCORER_KEYS,
+        compute_weighted_agreement_metrics,
+        extract_last_assistant_text,
+        run_scorer_comparison_async,
+    )
+    from redteam_runner.cli_utils import parse_token_set
+    from scorer import print_detailed_scorer_outputs, validate_scorer_keys
+    from utils.output_tools import Colors, print_banner, print_divider, print_scorer_comparison, setup_logging
+except ModuleNotFoundError as exc:
+    RUNTIME_IMPORT_ERROR = exc
 
 _LOG = logging.getLogger(__name__)
 
 CRESCENDO_MAX_BACKTRACKS: int = int(os.getenv("CRESCENDO_MAX_BACKTRACKS", "5"))
-CRESCENDO_MAX_TURNS: int = int(os.getenv("CRESCENDO_MAX_TURNS", str(MAX_TURNS)))
+if RUNTIME_IMPORT_ERROR is None:
+    CRESCENDO_MAX_TURNS: int = int(os.getenv("CRESCENDO_MAX_TURNS", str(MAX_TURNS)))
+else:
+    CRESCENDO_MAX_TURNS = int(os.getenv("CRESCENDO_MAX_TURNS", "4"))
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -84,26 +100,6 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--max-turns", type=int, default=CRESCENDO_MAX_TURNS)
     parser.add_argument("--dry-run", action="store_true", help="Print plan without executing attacks.")
     return parser
-
-
-def _validate_scorer_keys(*, selected_scorers: set[str] | None) -> None:
-    """Validate optional scorer key selection.
-
-    Args:
-        selected_scorers (set[str] | None): Requested scorer keys.
-
-    Raises:
-        ValueError: If any scorer key is unsupported.
-    """
-    if not selected_scorers:
-        return
-
-    invalid = sorted(set(selected_scorers) - set(AVAILABLE_SCORER_KEYS))
-    if invalid:
-        raise ValueError(
-            f"Unsupported scorer key(s): {', '.join(invalid)}. "
-            f"Supported keys: {', '.join(AVAILABLE_SCORER_KEYS)}"
-        )
 
 
 async def run_crescendo_suite_async(
@@ -126,15 +122,13 @@ async def run_crescendo_suite_async(
         dry_run (bool): If True, prints the plan only.
     """
     _LOG.info("Starting Crescendo suite")
-    print(f"\n{'#' * 66}")
-    print("  PyRIT x Ollama -- Crescendo Attack Suite")
-    print(f"{'#' * 66}")
+    print_banner(title="PyRIT x Ollama -- Crescendo Attack Suite")
 
     validate_ollama_endpoint(endpoint=OLLAMA_ENDPOINT, allow_remote_endpoint=False)
     if not dry_run:
         check_ollama_health(endpoint=OLLAMA_ENDPOINT)
 
-    _validate_scorer_keys(selected_scorers=selected_scorers)
+    validate_scorer_keys(selected_scorers=selected_scorers, available_scorer_keys=AVAILABLE_SCORER_KEYS)
 
     scenarios_to_run = [
         scenario
@@ -144,18 +138,18 @@ async def run_crescendo_suite_async(
 
     if not scenarios_to_run:
         _LOG.warning("No matching scenarios for selection: %s", selected_scenario_ids)
-        print("[!] No matching scenarios found.")
+        print(f"{Colors.YELLOW}[!]{Colors.RESET} No matching scenarios found.")
         return
 
-    print(f"\n  Max backtracks : {max_backtracks}")
-    print(f"  Max turns      : {max_turns}")
-    print(f"  Scenarios      : {', '.join(s.owasp_id for s in scenarios_to_run)}")
-    print(f"  Scorers        : {', '.join(sorted(selected_scorers)) if selected_scorers else 'all'}")
+    print(f"\n  {Colors.DIM}Max backtracks :{Colors.RESET} {max_backtracks}")
+    print(f"  {Colors.DIM}Max turns      :{Colors.RESET} {max_turns}")
+    print(f"  {Colors.DIM}Scenarios      :{Colors.RESET} {', '.join(s.owasp_id for s in scenarios_to_run)}")
+    print(f"  {Colors.DIM}Scorers        :{Colors.RESET} {', '.join(sorted(selected_scorers)) if selected_scorers else 'all'}")
 
     if dry_run:
-        print("\n[DRY RUN] Execution plan:")
+        print(f"\n{Colors.CYAN}[DRY RUN]{Colors.RESET} Execution plan:")
         for scenario in scenarios_to_run:
-            print(f"  - {scenario.owasp_id} ({scenario.owasp_name})")
+            print(f"  {Colors.CYAN}-{Colors.RESET} {scenario.owasp_id} ({scenario.owasp_name})")
         return
 
     await initialize_pyrit_async(memory_db_type=SQLITE, db_path=str(SQLITE_DB_PATH))
@@ -189,11 +183,15 @@ async def run_crescendo_suite_async(
         scenario = cast(OWASPScenario, plan_item["scenario"])
         chosen_dataset = cast(str | None, plan_item.get("dataset"))
 
-        print(f"\n{'─' * 66}")
-        print(f"  [{index:02d}/{len(execution_plan):02d}] CRESCENDO | {scenario.owasp_id} -- {scenario.owasp_name}")
-        print(f"  Dataset   : {chosen_dataset or '(none)'}")
-        print(f"  Objective : {scenario.objective[:80]} ...")
-        print(f"{'─' * 66}")
+        print()
+        print_divider()
+        print(
+            f"  {Colors.HEADER}[{index:02d}/{len(execution_plan):02d}] CRESCENDO | "
+            f"{scenario.owasp_id} -- {scenario.owasp_name}{Colors.RESET}"
+        )
+        print(f"  {Colors.DIM}Dataset   :{Colors.RESET} {chosen_dataset or '(none)'}")
+        print(f"  {Colors.DIM}Objective :{Colors.RESET} {scenario.objective[:80]} ...")
+        print_divider()
 
         scorer = SelfAskTrueFalseScorer(
             chat_target=tf_scorer_target,
@@ -227,7 +225,7 @@ async def run_crescendo_suite_async(
 
             conversation = memory.get_message_pieces(conversation_id=result.conversation_id)
             last_text = extract_last_assistant_text(conversation=conversation)
-            comparison, _ = await run_scorer_comparison_async(
+            comparison, comparison_json = await run_scorer_comparison_async(
                 response_text=last_text or "(no output)",
                 objective=scenario.objective,
                 tf_scorer_target=tf_scorer_target,
@@ -235,9 +233,15 @@ async def run_crescendo_suite_async(
                 refusal_scorer_target=refusal_scorer_target,
                 selected_scorers=selected_scorers,
             )
+            weighted_metrics = compute_weighted_agreement_metrics(comparison=comparison)
 
-            print(f"  Backtracks: {backtrack_count}")
-            print(f"  Scorer comparison: {comparison}")
+            print(f"  {Colors.DIM}Backtracks:{Colors.RESET} {backtrack_count}")
+            print_scorer_comparison(comparison=comparison, title="CRESCENDO SCORER OUTPUT")
+            print_detailed_scorer_outputs(
+                scorer_json=comparison_json,
+                weighted_metrics=weighted_metrics,
+                response_text=last_text or "(no output)",
+            )
             _LOG.info(
                 "Scenario %s completed outcome=%s backtracks=%s elapsed=%.1fs",
                 scenario.owasp_id,
@@ -257,7 +261,7 @@ async def run_crescendo_suite_async(
         except Exception:
             elapsed = time.monotonic() - start_time
             _LOG.exception("Crescendo failed for scenario=%s after %.1fs", scenario.owasp_id, elapsed)
-            print(f"  [ERROR] {scenario.owasp_id} failed. See logs for details.")
+            print(f"  {Colors.RED}[ERROR]{Colors.RESET} {scenario.owasp_id} failed. See logs for details.")
             results.append(
                 {
                     "owasp_id": scenario.owasp_id,
@@ -273,18 +277,32 @@ async def run_crescendo_suite_async(
         if "success" in str(row.get("outcome", "")).lower() or "achieved" in str(row.get("outcome", "")).lower()
     )
 
-    print(f"\n{'#' * 66}")
-    print(f"  Crescendo suite complete. {success_count}/{len(results)} scenario(s) succeeded.")
-    print(f"{'#' * 66}")
+    print_banner(title=f"Crescendo suite complete. {success_count}/{len(results)} scenario(s) succeeded.")
     _LOG.info("Crescendo suite complete: %d/%d succeeded", success_count, len(results))
 
 
 def main() -> None:
     """Run Crescendo suite from CLI."""
-    configure_runner_logging(level=logging.INFO)
-
     parser = _build_parser()
     args = parser.parse_args()
+
+    if RUNTIME_IMPORT_ERROR is not None:
+        if bool(args.dry_run):
+            print("[DRY-RUN] Crescendo runner argument parsing succeeded.")
+            print("[DRY-RUN] Runtime attack dependencies are unavailable in this environment.")
+            print(f"[DRY-RUN] Missing module: {RUNTIME_IMPORT_ERROR}")
+            return
+        raise RuntimeError(
+            "Crescendo runtime dependencies are unavailable. Install PyRIT components that provide pyrit.executor."
+        ) from RUNTIME_IMPORT_ERROR
+
+    configure_runner_logging(level=logging.INFO)
+    dual_writer = setup_logging(prefix="crescendo_attack_runner")
+    original_stdout = sys.stdout
+    original_stderr = sys.stderr
+
+    sys.stdout = dual_writer
+    sys.stderr = dual_writer
 
     try:
         asyncio.run(
@@ -303,6 +321,10 @@ def main() -> None:
     except Exception:
         _LOG.exception("Unhandled Crescendo runner failure")
         sys.exit(1)
+    finally:
+        sys.stdout = original_stdout
+        sys.stderr = original_stderr
+        dual_writer.close()
 
 
 if __name__ == "__main__":

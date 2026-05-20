@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 
+from scorer import build_run_flags, resolve_requested_scorers
+
 from .env_config import (
     FloatScaleThresholdScorer,
     Message,
@@ -196,16 +198,18 @@ async def run_scorer_comparison_async(
     refusal_scorer = SelfAskRefusalScorer(chat_target=refusal_scorer_target)
     compliance_scorer = TrueFalseInverterScorer(scorer=refusal_scorer)
 
-    requested_scorers = set(AVAILABLE_SCORER_KEYS) if not selected_scorers else set(selected_scorers)
-    for scorer_key in list(requested_scorers):
-        requested_scorers.update(SCORER_DEPENDENCIES.get(scorer_key, set()))
-
-    run_substring = "substring" in requested_scorers
-    run_tf = "self_ask_true_false" in requested_scorers
-    run_scale = "self_ask_scale" in requested_scorers or "scale_threshold_0_7" in requested_scorers
-    run_threshold = "scale_threshold_0_7" in requested_scorers
-    run_refusal = "refusal" in requested_scorers or "compliance_inverted_refusal" in requested_scorers
-    run_compliance = "compliance_inverted_refusal" in requested_scorers
+    requested_scorers = resolve_requested_scorers(
+        selected_scorers=selected_scorers,
+        available_scorer_keys=AVAILABLE_SCORER_KEYS,
+        scorer_dependencies=SCORER_DEPENDENCIES,
+    )
+    run_flags = build_run_flags(requested_scorers=requested_scorers)
+    run_substring = run_flags["run_substring"]
+    run_tf = run_flags["run_tf"]
+    run_scale = run_flags["run_scale"]
+    run_threshold = run_flags["run_threshold"]
+    run_refusal = run_flags["run_refusal"]
+    run_compliance = run_flags["run_compliance"]
 
     substring_result = (await substring_scorer.score_async(message=message, objective=objective))[0] if run_substring else None
     tf_result = (await tf_scorer.score_async(message=message, objective=objective))[0] if run_tf else None

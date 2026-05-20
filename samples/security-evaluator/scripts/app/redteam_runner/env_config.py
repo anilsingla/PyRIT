@@ -69,7 +69,6 @@ def ensure_packages_available(*, packages: list[str]) -> None:
 
 ensure_packages_available(packages=REQUIRED_PACKAGES)
 
-from pyrit.datasets import SeedDatasetProvider
 from pyrit.executor.attack import (
     AttackAdversarialConfig,
     AttackConverterConfig,
@@ -109,6 +108,46 @@ from pyrit.score import (
     TrueFalseQuestion,
 )
 from pyrit.setup import SQLITE, initialize_pyrit_async
+
+try:
+    from pyrit.datasets import SeedDatasetProvider  # type: ignore[attr-defined]
+except Exception:
+    class SeedDatasetProvider:  # type: ignore[no-redef]
+        """Compatibility fallback for older/newer PyRIT dataset APIs.
+
+        Provides a minimal provider over local files under `pyrit/datasets`.
+        """
+
+        _DATASET_ROOT = pathlib.Path(__file__).resolve().parents[4] / "pyrit" / "datasets"
+
+        @classmethod
+        def _iter_dataset_files(cls) -> list[pathlib.Path]:
+            if not cls._DATASET_ROOT.exists():
+                return []
+            patterns = ("*.prompt", "*.yaml", "*.yml")
+            files: list[pathlib.Path] = []
+            for pattern in patterns:
+                files.extend(cls._DATASET_ROOT.rglob(pattern))
+            return sorted(set(files))
+
+        @classmethod
+        def get_all_dataset_names(cls) -> list[str]:
+            names: set[str] = set()
+            for file_path in cls._iter_dataset_files():
+                names.add(file_path.stem)
+            return sorted(names)
+
+        @classmethod
+        async def fetch_datasets_async(cls, max_concurrency: int = 4) -> list[SeedDataset]:
+            del max_concurrency  # not used in fallback implementation
+            datasets: list[SeedDataset] = []
+            for file_path in cls._iter_dataset_files():
+                try:
+                    dataset = SeedDataset.from_yaml_file(str(file_path))
+                except Exception:
+                    continue
+                datasets.append(dataset)
+            return datasets
 
 
 DEBUG_ENABLED = read_env_bool(name="DEBUG", default=False)

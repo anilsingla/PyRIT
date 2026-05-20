@@ -1,0 +1,75 @@
+{
+  "overall_ok": true,
+  "checks": {
+    "all_scorers_defined": {
+      "ok": true,
+      "expected": [
+        "compliance_inverted_refusal",
+        "refusal",
+        "scale_threshold_0_7",
+        "self_ask_scale",
+        "self_ask_true_false",
+        "substring"
+      ],
+      "found": [
+        "compliance_inverted_refusal",
+        "refusal",
+        "scale_threshold_0_7",
+        "self_ask_scale",
+        "self_ask_true_false",
+        "substring"
+      ]
+    },
+    "all_scorers_and_datasets_cli_flags": {
+      "ok": true,
+      "required_flags": [
+        "--all-scorers",
+        "--all-datasets"
+      ]
+    },
+    "all_datasets_provider_hook": {
+      "ok": true,
+      "required_symbol": "get_all_dataset_names"
+    },
+    "report_structure_coverage": {
+      "ok": true,
+      "expected_keys": [
+        "all_selection_comparison_json",
+        "batch_scorer_check_json",
+        "cases_root",
+        "report_summary_json",
+        "run_report_html",
+        "run_report_json",
+        "run_report_md",
+        "run_root",
+        "scorer_comparison_csv",
+        "scorer_outputs_json"
+      ],
+      "found_keys": [
+        "all_selection_comparison_json",
+        "batch_scorer_check_json",
+        "cases_root",
+        "report_summary_json",
+        "run_report_html",
+        "run_report_json",
+        "run_report_md",
+        "run_root",
+        "scorer_comparison_csv",
+        "scorer_outputs_json"
+      ]
+    },
+    "log_structure_coverage": {
+      "ok": true,
+      "required_constants": [
+        "LOGS_ROOT_PATH",
+        "PRODUCTION_RUN_CHECKPOINT_PATH",
+        "PRODUCTION_RUN_LOG_PATH"
+      ]
+    },
+    "banking_custom_dataset": {
+      "ok": true,
+      "message": "Custom banking dataset valid with 5 seed(s)",
+      "path": "samples\\security-evaluator\\custom_datasets\\banking_app_security_dataset.json"
+    }
+  }
+}

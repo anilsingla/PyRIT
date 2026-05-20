@@ -66,6 +66,15 @@ logs/                            ← Production log + checkpoint
 python scripts/app/main.py --dry-run --local-datasets-only
 ```
 
+**Run the standalone RedTeam runner (dual screen+file logs):**
+
+```bash
+python scripts/app/attacks/redteam_attack_runner.py --dry-run
+python scripts/app/attacks/redteam_attack_runner.py --scorers self_ask_true_false refusal
+```
+
+Standalone runner logs are written to `pyrit_sec_eval_logs/` while still streaming to the console.
+
 **Test with smaller dataset:**
 
 ```bash

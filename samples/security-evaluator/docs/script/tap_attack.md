@@ -58,7 +58,8 @@ python scripts/app/attacks/tap_attack_runner.py --scenarios LLM01 --width 3 --de
 ## Output
 
 - Attack results are persisted in SQLite memory with `attack_mode=tap`
-- Console prints per-scenario outcome and scorer comparison
+- Console prints per-scenario outcome plus compact + detailed scorer breakdowns
+- Standalone TAP runner writes dual screen+file logs under `pyrit_sec_eval_logs/`
 
 Generate a visual report:
 

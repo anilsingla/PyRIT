@@ -21,26 +21,37 @@ import sys
 import time
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+_APP_ROOT = Path(__file__).resolve().parents[1]
+_SCRIPTS_ROOT = Path(__file__).resolve().parents[2]
+_REPO_ROOT = Path(__file__).resolve().parents[5]
+for _path in (str(_APP_ROOT), str(_SCRIPTS_ROOT), str(_REPO_ROOT)):
+    if _path not in sys.path:
+        sys.path.insert(0, _path)
 
-from pyrit.executor.workflow import XPIAContext, XPIATestWorkflow
-from pyrit.models import Message, MessagePiece
-from redteam_runner.cli_utils import parse_token_set
-from redteam_runner.converter_ops import build_ollama_target
-from redteam_runner.env_config import (
-    OLLAMA_ENDPOINT,
-    OLLAMA_TARGET_MODEL,
-    OLLAMA_TF_SCORER_MODEL,
-    OWASP_SCENARIOS,
-    SQLITE,
-    SQLITE_DB_PATH,
-    SelfAskTrueFalseScorer,
-    TrueFalseQuestion,
-    check_ollama_health,
-    configure_runner_logging,
-    initialize_pyrit_async,
-    validate_ollama_endpoint,
-)
+RUNTIME_IMPORT_ERROR: ModuleNotFoundError | None = None
+
+try:
+    from pyrit.executor.workflow import XPIAContext, XPIATestWorkflow
+    from pyrit.models import Message, MessagePiece
+    from redteam_runner.cli_utils import parse_token_set
+    from redteam_runner.converter_ops import build_ollama_target
+    from redteam_runner.env_config import (
+        OLLAMA_ENDPOINT,
+        OLLAMA_TARGET_MODEL,
+        OLLAMA_TF_SCORER_MODEL,
+        OWASP_SCENARIOS,
+        SQLITE,
+        SQLITE_DB_PATH,
+        SelfAskTrueFalseScorer,
+        TrueFalseQuestion,
+        check_ollama_health,
+        configure_runner_logging,
+        initialize_pyrit_async,
+        validate_ollama_endpoint,
+    )
+    from utils.output_tools import Colors, print_banner, print_divider
+except ModuleNotFoundError as exc:
+    RUNTIME_IMPORT_ERROR = exc
 
 _LOG = logging.getLogger(__name__)
 
@@ -92,9 +103,7 @@ async def run_xpia_suite_async(*, selected_scenario_ids: set[str] | None, dry_ru
     """
     _LOG.info("Starting XPIA suite")
 
-    print(f"\n{'#' * 66}")
-    print("  PyRIT x Ollama -- XPIA (Cross-Prompt Injection) Suite")
-    print(f"{'#' * 66}")
+    print_banner(title="PyRIT x Ollama -- XPIA (Cross-Prompt Injection) Suite")
 
     validate_ollama_endpoint(endpoint=OLLAMA_ENDPOINT, allow_remote_endpoint=False)
     if not dry_run:
@@ -104,17 +113,17 @@ async def run_xpia_suite_async(*, selected_scenario_ids: set[str] | None, dry_ru
     scenarios_to_run = [scenario for scenario in OWASP_SCENARIOS if scenario.owasp_id in effective_ids]
 
     if not scenarios_to_run:
-        print("[!] No matching scenarios found.")
+        print(f"{Colors.YELLOW}[!]{Colors.RESET} No matching scenarios found.")
         _LOG.warning("No matching XPIA scenarios for selection: %s", effective_ids)
         return
 
-    print(f"\n  Running XPIA on: {', '.join(s.owasp_id for s in scenarios_to_run)}")
+    print(f"\n  {Colors.DIM}Running XPIA on:{Colors.RESET} {', '.join(s.owasp_id for s in scenarios_to_run)}")
 
     if dry_run:
-        print("\n[DRY RUN] Execution plan:")
+        print(f"\n{Colors.CYAN}[DRY RUN]{Colors.RESET} Execution plan:")
         for scenario in scenarios_to_run:
-            print(f"  - {scenario.owasp_id} ({scenario.owasp_name})")
-            print(f"    Injected objective: {scenario.objective[:80]} ...")
+            print(f"  {Colors.CYAN}-{Colors.RESET} {scenario.owasp_id} ({scenario.owasp_name})")
+            print(f"    {Colors.DIM}Injected objective:{Colors.RESET} {scenario.objective[:80]} ...")
         return
 
     await initialize_pyrit_async(memory_db_type=SQLITE, db_path=str(SQLITE_DB_PATH))
@@ -124,10 +133,14 @@ async def run_xpia_suite_async(*, selected_scenario_ids: set[str] | None, dry_ru
 
     results: list[dict[str, object]] = []
     for index, scenario in enumerate(scenarios_to_run, start=1):
-        print(f"\n{'─' * 66}")
-        print(f"  [{index:02d}/{len(scenarios_to_run):02d}] XPIA | {scenario.owasp_id} -- {scenario.owasp_name}")
-        print(f"  Injected objective: {scenario.objective[:80]} ...")
-        print(f"{'─' * 66}")
+        print()
+        print_divider()
+        print(
+            f"  {Colors.HEADER}[{index:02d}/{len(scenarios_to_run):02d}] XPIA | "
+            f"{scenario.owasp_id} -- {scenario.owasp_name}{Colors.RESET}"
+        )
+        print(f"  {Colors.DIM}Injected objective:{Colors.RESET} {scenario.objective[:80]} ...")
+        print_divider()
 
         scorer = SelfAskTrueFalseScorer(
             chat_target=scorer_target,
@@ -154,8 +167,14 @@ async def run_xpia_suite_async(*, selected_scenario_ids: set[str] | None, dry_ru
         try:
             xpia_result = await xpia_workflow.execute_async(context=context)
             elapsed = time.monotonic() - start_time
-            print(f"  XPIA status : {xpia_result.status.value}")
-            print(f"  Score       : {xpia_result.score}")
+            status = str(xpia_result.status.value)
+            status_colored = (
+                f"{Colors.GREEN}{status}{Colors.RESET}"
+                if status.lower() == "success"
+                else f"{Colors.YELLOW}{status}{Colors.RESET}"
+            )
+            print(f"  {Colors.DIM}XPIA status:{Colors.RESET} {status_colored}")
+            print(f"  {Colors.DIM}Score      :{Colors.RESET} {Colors.WHITE}{xpia_result.score}{Colors.RESET}")
             _LOG.info(
                 "Scenario %s status=%s score=%s elapsed=%.1fs",
                 scenario.owasp_id,
@@ -173,7 +192,7 @@ async def run_xpia_suite_async(*, selected_scenario_ids: set[str] | None, dry_ru
             )
         except Exception:
             elapsed = time.monotonic() - start_time
-            print(f"  [ERROR] {scenario.owasp_id} failed. See logs for details.")
+            print(f"  {Colors.RED}[ERROR]{Colors.RESET} {scenario.owasp_id} failed. See logs for details.")
             _LOG.exception("XPIA failed for scenario=%s after %.1fs", scenario.owasp_id, elapsed)
             results.append(
                 {
@@ -184,18 +203,26 @@ async def run_xpia_suite_async(*, selected_scenario_ids: set[str] | None, dry_ru
             )
 
     success_count = sum(1 for row in results if row.get("status") == "success")
-    print(f"\n{'#' * 66}")
-    print(f"  XPIA suite complete. {success_count}/{len(results)} scenario(s) successful.")
-    print(f"{'#' * 66}")
+    print_banner(title=f"XPIA suite complete. {success_count}/{len(results)} scenario(s) successful.")
     _LOG.info("XPIA suite complete: %d/%d successful", success_count, len(results))
 
 
 def main() -> None:
     """CLI entry point for XPIA runner."""
-    configure_runner_logging(level=logging.INFO)
-
     parser = _build_parser()
     args = parser.parse_args()
+
+    if RUNTIME_IMPORT_ERROR is not None:
+        if bool(args.dry_run):
+            print("[DRY-RUN] XPIA runner argument parsing succeeded.")
+            print("[DRY-RUN] Runtime attack dependencies are unavailable in this environment.")
+            print(f"[DRY-RUN] Missing module: {RUNTIME_IMPORT_ERROR}")
+            return
+        raise RuntimeError(
+            "XPIA runtime dependencies are unavailable. Install PyRIT components that provide pyrit.executor."
+        ) from RUNTIME_IMPORT_ERROR
+
+    configure_runner_logging(level=logging.INFO)
 
     try:
         asyncio.run(run_xpia_suite_async(selected_scenario_ids=parse_token_set(args.scenarios), dry_run=bool(args.dry_run)))

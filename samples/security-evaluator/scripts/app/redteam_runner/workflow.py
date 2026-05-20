@@ -6,15 +6,42 @@ import os
 import webbrowser
 from pathlib import Path
 
-from redteam_runner.env_config import (
-    ARTIFACTS_ROOT_PATH,
-    MAX_TURNS,
-    REPORTS_ROOT_PATH,
-    RUN_REPORT_JSON_PATH,
-    SCORER_OUTPUTS_JSON_PATH,
-    SQLITE_DB_PATH,
-)
 from redteam_runner.reporting_ops import build_run_artifacts_root, build_run_report_paths
+
+
+ARTIFACTS_ROOT_PATH = Path(os.getenv("ARTIFACTS_ROOT_PATH", "reports")).resolve()
+MAX_TURNS = int(os.getenv("PYRIT_MAX_TURNS", "4"))
+SQLITE_DB_PATH = Path(
+    os.getenv("PYRIT_SQLITE_DB_PATH", str((ARTIFACTS_ROOT_PATH / "pyrit_ollama_demo.db").resolve()))
+).resolve()
+
+
+def _maybe_generate_report(
+    *,
+    should_generate_report: bool,
+    run_paths: dict[str, Path],
+    output_html: Path | None,
+    output_md: Path | None,
+    output_json: Path | None,
+    open_report: bool,
+) -> Path | None:
+    if not should_generate_report:
+        return None
+
+    from utils.generate_html_report import generate_html_report
+
+    default_html = run_paths["run_report_html"]
+    output_path = generate_html_report(
+        scorer_json_path=run_paths["scorer_outputs_json"],
+        cases_dir=run_paths["cases_root"],
+        run_report_path=run_paths["run_report_json"],
+        output_html=output_html or default_html,
+        output_md=output_md,
+        output_json=output_json or run_paths["report_summary_json"],
+    )
+    if open_report:
+        webbrowser.open(output_path.as_uri())
+    return output_path
 
 
 async def run_attack_mode_async(
@@ -68,6 +95,14 @@ async def run_attack_mode_async(
     )
     run_paths = build_run_report_paths(run_root=run_root)
 
+    if dry_run and attack_mode != "report":
+        print("[DRY-RUN] Attack mode validation successful.")
+        print(f"[DRY-RUN] mode={attack_mode}")
+        print(f"[DRY-RUN] datasets={sorted(selected_dataset_tokens) if selected_dataset_tokens else ['all_datasets']}")
+        print(f"[DRY-RUN] scorers={sorted(selected_scorers) if selected_scorers else ['all_scorers']}")
+        print(f"[DRY-RUN] converters={sorted(selected_converters) if selected_converters else ['default_or_all']}")
+        return None
+
     # redteam: Full orchestration against OWASP scenarios using shared datasets,
     # converters, scorers, retries, and reporting. Choose this for primary runs.
     if attack_mode == "redteam":
@@ -82,22 +117,14 @@ async def run_attack_mode_async(
             max_turns_override=redteam_max_turns_override,
             report_root=run_root,
         )
-        if not should_generate_report:
-            return None
-        from report.generate_html_report import generate_html_report
-
-        default_html = run_paths["run_report_html"]
-        output_path = generate_html_report(
-            scorer_json_path=run_paths["scorer_outputs_json"],
-            cases_dir=run_paths["cases_root"],
-            run_report_path=run_paths["run_report_json"],
-            output_html=output_html or default_html,
+        return _maybe_generate_report(
+            should_generate_report=should_generate_report,
+            run_paths=run_paths,
+            output_html=output_html,
             output_md=output_md,
-            output_json=run_paths["report_summary_json"],
+            output_json=None,
+            open_report=open_report,
         )
-        if open_report:
-            webbrowser.open(output_path.as_uri())
-        return output_path
 
     # tap: Tree-of-Attacks with Pruning; explores multiple adversarial branches
     # and prunes weak paths. Choose when you need wider/deeper jailbreak search.
@@ -113,22 +140,14 @@ async def run_attack_mode_async(
             depth=tap_depth_override or int(os.getenv("TAP_DEPTH", "5")),
             dry_run=dry_run,
         )
-        if not should_generate_report:
-            return None
-        from report.generate_html_report import generate_html_report
-
-        default_html = run_paths["run_report_html"]
-        output_path = generate_html_report(
-            scorer_json_path=run_paths["scorer_outputs_json"],
-            cases_dir=run_paths["cases_root"],
-            run_report_path=run_paths["run_report_json"],
-            output_html=output_html or default_html,
+        return _maybe_generate_report(
+            should_generate_report=should_generate_report,
+            run_paths=run_paths,
+            output_html=output_html,
             output_md=output_md,
-            output_json=run_paths["report_summary_json"],
+            output_json=None,
+            open_report=open_report,
         )
-        if open_report:
-            webbrowser.open(output_path.as_uri())
-        return output_path
 
     # crescendo: Gradual escalation with configurable backtracking and turn limits.
     # Choose when testing persistence and conversational pressure over time.
@@ -143,22 +162,14 @@ async def run_attack_mode_async(
             max_turns=crescendo_max_turns_override or int(os.getenv("CRESCENDO_MAX_TURNS", str(MAX_TURNS))),
             dry_run=dry_run,
         )
-        if not should_generate_report:
-            return None
-        from report.generate_html_report import generate_html_report
-
-        default_html = run_paths["run_report_html"]
-        output_path = generate_html_report(
-            scorer_json_path=run_paths["scorer_outputs_json"],
-            cases_dir=run_paths["cases_root"],
-            run_report_path=run_paths["run_report_json"],
-            output_html=output_html or default_html,
+        return _maybe_generate_report(
+            should_generate_report=should_generate_report,
+            run_paths=run_paths,
+            output_html=output_html,
             output_md=output_md,
-            output_json=run_paths["report_summary_json"],
+            output_json=None,
+            open_report=open_report,
         )
-        if open_report:
-            webbrowser.open(output_path.as_uri())
-        return output_path
 
     # xpia: Cross-Prompt Injection Attack simulation for hidden/indirect
     # instruction channels. Choose for LLM02/LLM08-style injection risks.
@@ -166,22 +177,14 @@ async def run_attack_mode_async(
         from attacks.xpia_attack_runner import run_xpia_suite_async
 
         await run_xpia_suite_async(selected_scenario_ids=selected_scenario_ids, dry_run=dry_run)
-        if not should_generate_report:
-            return None
-        from report.generate_html_report import generate_html_report
-
-        default_html = run_paths["run_report_html"]
-        output_path = generate_html_report(
-            scorer_json_path=run_paths["scorer_outputs_json"],
-            cases_dir=run_paths["cases_root"],
-            run_report_path=run_paths["run_report_json"],
-            output_html=output_html or default_html,
+        return _maybe_generate_report(
+            should_generate_report=should_generate_report,
+            run_paths=run_paths,
+            output_html=output_html,
             output_md=output_md,
-            output_json=run_paths["report_summary_json"],
+            output_json=None,
+            open_report=open_report,
         )
-        if open_report:
-            webbrowser.open(output_path.as_uri())
-        return output_path
 
     # baseline: Sends prompts without an adversarial attacker to measure default
     # model behavior. Choose as a control for comparing attack uplift.
@@ -196,22 +199,14 @@ async def run_attack_mode_async(
             dry_run=dry_run,
             report_root=run_root,
         )
-        if not should_generate_report:
-            return None
-        from report.generate_html_report import generate_html_report
-
-        default_html = run_paths["run_report_html"]
-        output_path = generate_html_report(
-            scorer_json_path=run_paths["scorer_outputs_json"],
-            cases_dir=run_paths["cases_root"],
-            run_report_path=run_paths["run_report_json"],
-            output_html=output_html or default_html,
+        return _maybe_generate_report(
+            should_generate_report=should_generate_report,
+            run_paths=run_paths,
+            output_html=output_html,
             output_md=output_md,
-            output_json=run_paths["report_summary_json"],
+            output_json=None,
+            open_report=open_report,
         )
-        if open_report:
-            webbrowser.open(output_path.as_uri())
-        return output_path
 
     # rescore: Re-runs selected scorers against stored conversations in SQLite.
     # Choose when scorer logic/models change and you want fast recomputation.
@@ -226,39 +221,25 @@ async def run_attack_mode_async(
             output_json=output_json or default_output,
             dry_run=dry_run,
         )
-        if not should_generate_report:
-            return None
-        from report.generate_html_report import generate_html_report
-
-        default_html = run_paths["run_report_html"]
-        output_path = generate_html_report(
-            scorer_json_path=run_paths["scorer_outputs_json"],
-            cases_dir=run_paths["cases_root"],
-            run_report_path=run_paths["run_report_json"],
-            output_html=output_html or default_html,
+        return _maybe_generate_report(
+            should_generate_report=should_generate_report,
+            run_paths=run_paths,
+            output_html=output_html,
             output_md=output_md,
-            output_json=run_paths["report_summary_json"],
+            output_json=None,
+            open_report=open_report,
         )
-        if open_report:
-            webbrowser.open(output_path.as_uri())
-        return output_path
 
     # report: Produces human-readable artifacts from prior run outputs.
     # Choose for HTML/Markdown summaries and sharing results.
     if attack_mode == "report":
-        from report.generate_html_report import generate_html_report
-
-        default_html = run_paths["run_report_html"]
-        output_path = generate_html_report(
-            scorer_json_path=run_paths["scorer_outputs_json"],
-            cases_dir=run_paths["cases_root"],
-            run_report_path=run_paths["run_report_json"],
-            output_html=output_html or default_html,
+        return _maybe_generate_report(
+            should_generate_report=True,
+            run_paths=run_paths,
+            output_html=output_html,
             output_md=output_md,
-            output_json=output_json or run_paths["report_summary_json"],
+            output_json=output_json,
+            open_report=open_report,
         )
-        if open_report:
-            webbrowser.open(output_path.as_uri())
-        return output_path
 
     raise ValueError(f"Unsupported attack mode: {attack_mode}")

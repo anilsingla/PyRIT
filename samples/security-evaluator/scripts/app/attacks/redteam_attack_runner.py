@@ -2,78 +2,101 @@
 
 from __future__ import annotations
 
+import argparse
+import asyncio
+import logging
+
+import sys
 from pathlib import Path
 from typing import cast
 
-from redteam_runner.converter_ops import build_converter_config, build_ollama_target
-from redteam_runner.dataset_ops import (
-    build_execution_plan,
-    load_seed_dataset_from_path,
-    print_dataset_preview,
-    sync_dataset_to_memory_async,
-)
-from redteam_runner.env_config import (
-    ARTIFACTS_ROOT_PATH,
-    AttackAdversarialConfig,
-    AttackOutcome,
-    AttackScoringConfig,
-    BATCH_SCORER_CHECK_JSON_PATH,
-    BatchScorer,
-    CentralMemory,
-    ConsoleAttackResultPrinter,
-    MAX_DATASETS_PER_SCENARIO,
-    MAX_TURNS,
-    OLLAMA_ATTACKER_MODEL,
-    OLLAMA_CONVERTER_MODEL,
-    OLLAMA_MAX_RETRIES_PER_SCENARIO,
-    OLLAMA_REFUSAL_SCORER_MODEL,
-    OLLAMA_RETRY_WAIT_SECONDS,
-    OLLAMA_SCALE_SCORER_MODEL,
-    OLLAMA_SCORER_MODEL,
-    OLLAMA_TARGET_MODEL,
-    OLLAMA_TF_SCORER_MODEL,
-    OLLAMA_ENDPOINT,
-    OWASPScenario,
-    OWASP_SCENARIOS,
-    RedTeamingAttack,
-    REPORTS_ROOT_PATH,
-    RESUME_INCOMPLETE_RUN,
-    RUN_ALL_AVAILABLE_DATASETS,
-    RUN_REPORT_JSON_PATH,
-    SQLITE,
-    SQLITE_DB_PATH,
-    SCORER_COMPARISON_CSV_PATH,
-    SCORER_OUTPUTS_JSON_PATH,
-    SeedDatasetProvider,
-    SeedDataset,
-    SelfAskTrueFalseScorer,
-    SubStringScorer,
-    TrueFalseQuestion,
-    check_ollama_health,
-    debug_log,
-    initialize_pyrit_async,
-    validate_ollama_endpoint,
-)
-from redteam_runner.reporting_ops import (
-    append_production_log,
-    build_run_report_paths,
-    export_batch_scorer_check_json,
-    export_per_scorer_case_reports,
-    export_run_report_json,
-    export_scorer_comparison_csv,
-    export_scorer_outputs_json,
-    get_seed_tracking_info,
-    initial_resume_state,
-    load_resume_state,
-    save_resume_state,
-)
-from redteam_runner.scoring_ops import (
-    AVAILABLE_SCORER_KEYS,
-    compute_weighted_agreement_metrics,
-    extract_last_assistant_text,
-    run_scorer_comparison_async,
-    score_to_json_dict,
-)
+_APP_ROOT = Path(__file__).resolve().parents[1]
+_SCRIPTS_ROOT = Path(__file__).resolve().parents[2]
+_REPO_ROOT = Path(__file__).resolve().parents[5]
+for _path in (str(_APP_ROOT), str(_SCRIPTS_ROOT), str(_REPO_ROOT)):
+    if _path not in sys.path:
+        sys.path.insert(0, _path)
+
+RUNTIME_IMPORT_ERROR: ModuleNotFoundError | None = None
+
+try:
+    # Dual output and color tools
+    from utils.output_tools import Colors, print_scorer_comparison, setup_logging
+    from scorer import print_detailed_scorer_outputs
+
+    from redteam_runner.converter_ops import build_converter_config, build_ollama_target
+    from redteam_runner.cli_utils import parse_token_set
+    from redteam_runner.dataset_ops import (
+        build_execution_plan,
+        load_seed_dataset_from_path,
+        print_dataset_preview,
+        sync_dataset_to_memory_async,
+    )
+    from redteam_runner.env_config import (
+        ARTIFACTS_ROOT_PATH,
+        AttackAdversarialConfig,
+        AttackOutcome,
+        AttackScoringConfig,
+        BATCH_SCORER_CHECK_JSON_PATH,
+        BatchScorer,
+        CentralMemory,
+        ConsoleAttackResultPrinter,
+        MAX_DATASETS_PER_SCENARIO,
+        MAX_TURNS,
+        OLLAMA_ATTACKER_MODEL,
+        OLLAMA_CONVERTER_MODEL,
+        OLLAMA_MAX_RETRIES_PER_SCENARIO,
+        OLLAMA_REFUSAL_SCORER_MODEL,
+        OLLAMA_RETRY_WAIT_SECONDS,
+        OLLAMA_SCALE_SCORER_MODEL,
+        OLLAMA_SCORER_MODEL,
+        OLLAMA_TARGET_MODEL,
+        OLLAMA_TF_SCORER_MODEL,
+        OLLAMA_ENDPOINT,
+        OWASPScenario,
+        OWASP_SCENARIOS,
+        RedTeamingAttack,
+        REPORTS_ROOT_PATH,
+        RESUME_INCOMPLETE_RUN,
+        RUN_ALL_AVAILABLE_DATASETS,
+        RUN_REPORT_JSON_PATH,
+        SQLITE,
+        SQLITE_DB_PATH,
+        SCORER_COMPARISON_CSV_PATH,
+        SCORER_OUTPUTS_JSON_PATH,
+        SeedDatasetProvider,
+        SeedDataset,
+        SelfAskTrueFalseScorer,
+        SubStringScorer,
+        TrueFalseQuestion,
+        check_ollama_health,
+        configure_runner_logging,
+        debug_log,
+        initialize_pyrit_async,
+        validate_ollama_endpoint,
+    )
+    from redteam_runner.reporting_ops import (
+        append_production_log,
+        build_run_report_paths,
+        export_batch_scorer_check_json,
+        export_per_scorer_case_reports,
+        export_run_report_json,
+        export_scorer_comparison_csv,
+        export_scorer_outputs_json,
+        get_seed_tracking_info,
+        initial_resume_state,
+        load_resume_state,
+        save_resume_state,
+    )
+    from redteam_runner.scoring_ops import (
+        AVAILABLE_SCORER_KEYS,
+        compute_weighted_agreement_metrics,
+        extract_last_assistant_text,
+        run_scorer_comparison_async,
+        score_to_json_dict,
+    )
+except ModuleNotFoundError as exc:
+    RUNTIME_IMPORT_ERROR = exc
 
 
 def _normalize_selection(*, values: list[str] | None) -> set[str] | None:
@@ -88,6 +111,10 @@ def _normalize_selection(*, values: list[str] | None) -> set[str] | None:
             if cleaned:
                 normalized.add(cleaned)
     return normalized or None
+
+
+if RUNTIME_IMPORT_ERROR is None:
+    _print_scorer_outputs = print_detailed_scorer_outputs
 
 
 async def run_redteam_suite_async(
@@ -405,18 +432,19 @@ async def run_redteam_suite_async(
         },
     )
 
+
     for scenario_index in range(start_index, len(scenario_execution_plan)):
         execution_item = scenario_execution_plan[scenario_index]
         scenario = cast(OWASPScenario, execution_item["scenario"])
         chosen_dataset = cast(str | None, execution_item.get("dataset"))
         seed_tracking = get_seed_tracking_info(memory=memory, dataset_name=chosen_dataset)
 
-        print(f"\n{'─' * 66}")
-        print(f"  {scenario.owasp_id} -- {scenario.owasp_name}")
-        print(f"  Dataset   : {chosen_dataset or '(none -- using objective directly)'}")
-        print(f"  Converter : {scenario.converter}")
-        print(f"  Objective : {scenario.objective[:80]} ...")
-        print(f"{'─' * 66}")
+        print(f"\n{Colors.CYAN}{'─' * 66}{Colors.RESET}")
+        print(f"  {Colors.HEADER}{scenario.owasp_id} -- {scenario.owasp_name}{Colors.RESET}")
+        print(f"  {Colors.DIM}Dataset   :{Colors.RESET} {chosen_dataset or '(none -- using objective directly)'}")
+        print(f"  {Colors.DIM}Converter :{Colors.RESET} {scenario.converter}")
+        print(f"  {Colors.DIM}Objective :{Colors.RESET} {scenario.objective[:80]} ...")
+        print(f"{Colors.CYAN}{'─' * 66}{Colors.RESET}")
 
         append_production_log(
             event="scenario_started",
@@ -500,6 +528,14 @@ async def run_redteam_suite_async(
                 )
                 weighted_metrics = compute_weighted_agreement_metrics(comparison=comparison)
 
+                print_scorer_comparison(comparison=comparison, title="REDTEAM SCORER OUTPUT")
+
+                _print_scorer_outputs(
+                    scorer_json=scorer_json,
+                    weighted_metrics=weighted_metrics,
+                    response_text=last_assistant_text,
+                )
+
                 per_case_files = export_per_scorer_case_reports(
                     owasp_id=scenario.owasp_id,
                     owasp_name=scenario.owasp_name,
@@ -513,7 +549,7 @@ async def run_redteam_suite_async(
                     cases_root=run_paths["cases_root"],
                 )
                 for report_file in per_case_files:
-                    print(f"[v] Scorer case report : {report_file}")
+                    print(f"{Colors.GREEN}[v]{Colors.RESET} Scorer case report : {Colors.CYAN}{report_file}{Colors.RESET}")
                 per_case_report_total_files += len(per_case_files)
 
                 scenario_bucket = per_case_report_counts.setdefault(scenario.owasp_id, {})
@@ -587,13 +623,13 @@ async def run_redteam_suite_async(
                 )
                 if attempt_number < OLLAMA_MAX_RETRIES_PER_SCENARIO:
                     print(
-                        f"  [!] Attempt {attempt_number}/{OLLAMA_MAX_RETRIES_PER_SCENARIO} failed: {exc}. "
-                        f"Retrying in {OLLAMA_RETRY_WAIT_SECONDS}s ..."
+                        f"  {Colors.YELLOW}[!]{Colors.RESET} Attempt {attempt_number}/{OLLAMA_MAX_RETRIES_PER_SCENARIO} failed: "
+                        f"{Colors.YELLOW}{exc}{Colors.RESET}. Retrying in {OLLAMA_RETRY_WAIT_SECONDS}s ..."
                     )
 
         if not scenario_completed:
             error_text = str(last_exception) if last_exception else "unknown_error"
-            print(f"  [!] Attack failed after retries: {error_text}")
+            print(f"  {Colors.RED}[!]{Colors.RESET} Attack failed after retries: {Colors.RED}{error_text}{Colors.RESET}")
 
             error_scores = {
                 "substring": score_to_json_dict(scorer_name="SubStringScorer", score=None),
@@ -608,6 +644,34 @@ async def run_redteam_suite_async(
                 ),
             }
 
+            _print_scorer_outputs(
+                scorer_json=error_scores,
+                weighted_metrics={
+                    "weighted_majority": "error",
+                    "weighted_confidence": "error",
+                    "weighted_disagreement": "error",
+                    "scale_vote": "error",
+                    "scale_raw": "error",
+                },
+                response_text=error_text,
+            )
+            print_scorer_comparison(
+                comparison={
+                    "substring": "error",
+                    "self_ask_true_false": "error",
+                    "self_ask_scale": "error",
+                    "scale_threshold_0_7": "error",
+                    "refusal": "error",
+                    "compliance_inverted_refusal": "error",
+                    "weighted_majority": "error",
+                    "weighted_confidence": "error",
+                    "weighted_disagreement": "error",
+                    "scale_raw": "error",
+                    "scale_vote": "error",
+                },
+                title="REDTEAM SCORER OUTPUT",
+            )
+
             per_case_files = export_per_scorer_case_reports(
                 owasp_id=scenario.owasp_id,
                 owasp_name=scenario.owasp_name,
@@ -621,7 +685,7 @@ async def run_redteam_suite_async(
                 cases_root=run_paths["cases_root"],
             )
             for report_file in per_case_files:
-                print(f"[v] Scorer case report : {report_file}")
+                print(f"{Colors.GREEN}[v]{Colors.RESET} Scorer case report : {Colors.CYAN}{report_file}{Colors.RESET}")
             per_case_report_total_files += len(per_case_files)
 
             scenario_bucket = per_case_report_counts.setdefault(scenario.owasp_id, {})
@@ -696,24 +760,24 @@ async def run_redteam_suite_async(
         }
         save_resume_state(state=resume_state)
 
-    print(f"\n\n{'=' * 66}")
-    print("  OWASP LLM Top-10 Attack Summary")
-    print(f"{'=' * 66}")
-    print(f"  {'ID':<8}  {'Category':<32}  {'Succeeded':<11}  Turns")
+    print(f"\n\n{Colors.HEADER}{'=' * 66}{Colors.RESET}")
+    print(f"  {Colors.HEADER}OWASP LLM Top-10 Attack Summary{Colors.RESET}")
+    print(f"{Colors.HEADER}{'=' * 66}{Colors.RESET}")
+    print(f"  {Colors.CYAN}{'ID':<8}{Colors.RESET}  {Colors.CYAN}{'Category':<32}{Colors.RESET}  {Colors.CYAN}{'Succeeded':<11}{Colors.RESET}  {Colors.CYAN}Turns{Colors.RESET}")
     print(f"  {'------':<8}  {'-----------------------------':<32}  {'---------':<11}  -----")
     for result in results_summary:
-        status = "YES" if result["succeeded"] else "NO "
+        status = f"{Colors.GREEN}YES{Colors.RESET}" if result["succeeded"] else f"{Colors.RED}NO {Colors.RESET}"
         err = f"  [err: {result['error'][:40]}]" if "error" in result else ""
         print(f"  {result['owasp_id']:<8}  {result['owasp_name']:<32}  {status:<11}  {result['turns_used']}{err}")
 
     export_scorer_comparison_csv(rows=scorer_comparisons, output_path=run_paths["scorer_comparison_csv"])
     export_scorer_outputs_json(rows=scorer_outputs_json_rows, output_path=run_paths["scorer_outputs_json"])
 
-    print(f"\n[v] CSV export  : {run_paths['scorer_comparison_csv']}")
-    print(f"[v] JSON export : {run_paths['scorer_outputs_json']}")
-    print(f"[v] Reports root: {run_paths['cases_root']}")
-    print(f"[v] Artifacts   : {run_paths['run_root']}")
-    print(f"[v] Case reports: {per_case_report_total_files}")
+    print(f"\n{Colors.GREEN}[v]{Colors.RESET} CSV export  : {Colors.CYAN}{run_paths['scorer_comparison_csv']}{Colors.RESET}")
+    print(f"{Colors.GREEN}[v]{Colors.RESET} JSON export : {Colors.CYAN}{run_paths['scorer_outputs_json']}{Colors.RESET}")
+    print(f"{Colors.GREEN}[v]{Colors.RESET} Reports root: {Colors.CYAN}{run_paths['cases_root']}{Colors.RESET}")
+    print(f"{Colors.GREEN}[v]{Colors.RESET} Artifacts   : {Colors.CYAN}{run_paths['run_root']}{Colors.RESET}")
+    print(f"{Colors.GREEN}[v]{Colors.RESET} Case reports: {Colors.CYAN}{per_case_report_total_files}{Colors.RESET}")
 
     valid_confidences = [
         float(row["weighted_confidence"]) for row in scorer_comparisons if row["weighted_confidence"] not in {"n/a", "error"}
@@ -777,7 +841,7 @@ async def run_redteam_suite_async(
         }
 
     export_batch_scorer_check_json(payload=batch_scorer_check_payload, output_path=run_paths["batch_scorer_check_json"])
-    print(f"[v] Batch JSON  : {run_paths['batch_scorer_check_json']}")
+    print(f"{Colors.GREEN}[v]{Colors.RESET} Batch JSON  : {Colors.CYAN}{run_paths['batch_scorer_check_json']}{Colors.RESET}")
 
     success_count = sum(1 for result in results_summary if result.get("succeeded"))
     failure_count = sum(1 for result in results_summary if not result.get("succeeded"))
@@ -788,6 +852,8 @@ async def run_redteam_suite_async(
             "max_turns": effective_max_turns,
             "run_all_available_datasets": RUN_ALL_AVAILABLE_DATASETS,
             "max_datasets_per_scenario": MAX_DATASETS_PER_SCENARIO,
+            "selected_datasets": sorted(selected_dataset_names) if selected_dataset_names else [],
+            "selected_scorers": sorted(selected_scorers) if selected_scorers else [],
             "planned_executions": len(scenario_execution_plan),
             "models": {
                 "target": OLLAMA_TARGET_MODEL,
@@ -855,5 +921,73 @@ async def run_redteam_suite_async(
         }
     )
 
-    print(f"[v] Run report  : {run_paths['run_report_json']}")
-    print(f"\n[v] Database : {SQLITE_DB_PATH}")
+    print(f"{Colors.GREEN}[v]{Colors.RESET} Run report  : {Colors.CYAN}{run_paths['run_report_json']}{Colors.RESET}")
+    print(f"\n{Colors.GREEN}[v]{Colors.RESET} Database : {Colors.CYAN}{SQLITE_DB_PATH}{Colors.RESET}")
+
+
+def _build_parser() -> argparse.ArgumentParser:
+    """Build standalone CLI parser for the redteam runner."""
+    parser = argparse.ArgumentParser(
+        description="Run OWASP RedTeamingAttack suite directly (standalone runner)."
+    )
+    parser.add_argument("--converters", nargs="*", default=[], help="Converter keys to run.")
+    parser.add_argument("--datasets", nargs="*", default=[], help="Dataset names or file paths.")
+    parser.add_argument("--scorers", nargs="*", default=[], help="Scorer keys to enable.")
+    parser.add_argument("--dry-run", action="store_true", help="Print plan without executing attacks.")
+    parser.add_argument(
+        "--local-datasets-only",
+        action="store_true",
+        help="Use only local/in-memory datasets and skip provider fetch.",
+    )
+    parser.add_argument("--max-turns", type=int, default=None, help="Override max turns for redteam attack.")
+    return parser
+
+
+def main() -> None:
+    """Standalone CLI entry point with dual output logging."""
+    parser = _build_parser()
+    args = parser.parse_args()
+
+    if RUNTIME_IMPORT_ERROR is not None:
+        if bool(args.dry_run):
+            print("[DRY-RUN] Redteam runner argument parsing succeeded.")
+            print("[DRY-RUN] Runtime attack dependencies are unavailable in this environment.")
+            print(f"[DRY-RUN] Missing module: {RUNTIME_IMPORT_ERROR}")
+            return
+        raise RuntimeError(
+            "Redteam runtime dependencies are unavailable. Install PyRIT components that provide pyrit.executor."
+        ) from RUNTIME_IMPORT_ERROR
+
+    configure_runner_logging(level=logging.INFO)
+    dual_writer = setup_logging(prefix="redteam_attack_runner")
+    original_stdout = sys.stdout
+    original_stderr = sys.stderr
+
+    sys.stdout = dual_writer
+    sys.stderr = dual_writer
+
+    try:
+        asyncio.run(
+            run_redteam_suite_async(
+                selected_converters=parse_token_set(args.converters),
+                selected_dataset_tokens=parse_token_set(args.datasets),
+                selected_scorers=parse_token_set(args.scorers),
+                dry_run=bool(args.dry_run),
+                local_datasets_only=bool(args.local_datasets_only),
+                max_turns_override=args.max_turns,
+            )
+        )
+    except KeyboardInterrupt:
+        logging.getLogger(__name__).warning("Interrupted by user")
+        sys.exit(130)
+    except Exception:
+        logging.getLogger(__name__).exception("Unhandled Redteam runner failure")
+        sys.exit(1)
+    finally:
+        sys.stdout = original_stdout
+        sys.stderr = original_stderr
+        dual_writer.close()
+
+
+if __name__ == "__main__":
+    main()

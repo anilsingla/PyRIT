@@ -53,7 +53,8 @@ python scripts/app/attacks/crescendo_attack_runner.py --scenarios LLM06 --max-ba
 ## Output
 
 - Results are stored with `attack_mode=crescendo`
-- Console output includes `backtrack_count` and scorer comparison
+- Console output includes `backtrack_count` plus compact + detailed scorer breakdowns
+- Standalone Crescendo runner writes dual screen+file logs under `pyrit_sec_eval_logs/`
 
 Interpretation guideline:
 

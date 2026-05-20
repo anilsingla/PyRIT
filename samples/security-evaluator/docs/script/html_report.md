@@ -26,7 +26,7 @@ python scripts/app/main.py --attack-mode report \
   --output-md reports/my_report.md
 
 # Standalone
-python scripts/app/report/generate_html_report.py \
+python scripts/app/utils/generate_html_report.py \
   --scorer-json reports/scorer_outputs.json \
   --cases-dir reports/cases \
   --run-report reports/run_report.json \
@@ -38,7 +38,30 @@ python scripts/app/report/generate_html_report.py \
 
 - Run metadata
 - Scenario summary table
+- Dataset -> scorer hierarchy table
+- Per-test-case execution summary table and result
 - Case details with scorer values
+
+## JSON Output For GUI / SQLite Import
+
+The `--output-json` artifact now includes:
+
+- `dataset_scorer_hierarchy`: grouped by dataset and scorer usage/stats
+- `test_case_execution_summaries`: one execution summary per test case
+- `gui_sqlite_import_payload.rows`: GUI import payload rows
+- `rows`: top-level alias for compatibility with `scripts/analysis/import_scorer_json_to_memory.py`
+
+When a run uses all datasets, all scorers, or both, the generator also writes:
+
+- `all_selection_comparison_report.json`: per-run dataset and scorer comparison report
+
+Example:
+
+```bash
+python scripts/analysis/import_scorer_json_to_memory.py \
+  --input-json reports/report_summary.json \
+  --db-path reports/gui_import.db
+```
 
 ## Related docs
 

@@ -30,52 +30,68 @@ import time
 from pathlib import Path
 from typing import cast
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+_APP_ROOT = Path(__file__).resolve().parents[1]
+_SCRIPTS_ROOT = Path(__file__).resolve().parents[2]
+_REPO_ROOT = Path(__file__).resolve().parents[5]
+for _path in (str(_APP_ROOT), str(_SCRIPTS_ROOT), str(_REPO_ROOT)):
+    if _path not in sys.path:
+        sys.path.insert(0, _path)
 
-from redteam_runner.converter_ops import build_ollama_target
-from redteam_runner.dataset_ops import build_execution_plan, sync_dataset_to_memory_async
-from redteam_runner.env_config import (
-    AttackScoringConfig,
-    REPORTS_ROOT_PATH,
-    RUN_REPORT_JSON_PATH,
-    SCORER_OUTPUTS_JSON_PATH,
-    CentralMemory,
-    OLLAMA_ENDPOINT,
-    OLLAMA_REFUSAL_SCORER_MODEL,
-    OLLAMA_SCALE_SCORER_MODEL,
-    OLLAMA_TARGET_MODEL,
-    OLLAMA_TF_SCORER_MODEL,
-    OWASPScenario,
-    OWASP_SCENARIOS,
-    ARTIFACTS_ROOT_PATH,
-    SQLITE,
-    SQLITE_DB_PATH,
-    SeedDataset,
-    SeedDatasetProvider,
-    SelfAskTrueFalseScorer,
-    TrueFalseQuestion,
-    check_ollama_health,
-    configure_runner_logging,
-    initialize_pyrit_async,
-    validate_ollama_endpoint,
-)
-from redteam_runner.reporting_ops import (
-    build_run_report_paths,
-    export_per_scorer_case_reports,
-    export_run_report_json,
-    export_scorer_outputs_json,
-)
-from redteam_runner.scoring_ops import extract_last_assistant_text, run_scorer_comparison_async, score_to_json_dict
-from redteam_runner.cli_utils import parse_token_set
-from pyrit.executor.attack import PromptSendingAttack
+RUNTIME_IMPORT_ERROR: ModuleNotFoundError | None = None
+
+try:
+    from redteam_runner.converter_ops import build_ollama_target
+    from redteam_runner.dataset_ops import build_execution_plan, sync_dataset_to_memory_async
+    from redteam_runner.env_config import (
+        AttackScoringConfig,
+        REPORTS_ROOT_PATH,
+        RUN_REPORT_JSON_PATH,
+        SCORER_OUTPUTS_JSON_PATH,
+        CentralMemory,
+        OLLAMA_ENDPOINT,
+        OLLAMA_REFUSAL_SCORER_MODEL,
+        OLLAMA_SCALE_SCORER_MODEL,
+        OLLAMA_TARGET_MODEL,
+        OLLAMA_TF_SCORER_MODEL,
+        OWASPScenario,
+        OWASP_SCENARIOS,
+        ARTIFACTS_ROOT_PATH,
+        SQLITE,
+        SQLITE_DB_PATH,
+        SeedDataset,
+        SeedDatasetProvider,
+        SelfAskTrueFalseScorer,
+        TrueFalseQuestion,
+        check_ollama_health,
+        configure_runner_logging,
+        initialize_pyrit_async,
+        validate_ollama_endpoint,
+    )
+    from redteam_runner.reporting_ops import (
+        build_run_report_paths,
+        export_per_scorer_case_reports,
+        export_run_report_json,
+        export_scorer_outputs_json,
+    )
+    from redteam_runner.scoring_ops import extract_last_assistant_text, run_scorer_comparison_async, score_to_json_dict
+    from redteam_runner.cli_utils import parse_token_set
+    from reports import write_json_report
+    from scorer import build_default_scorer_payload
+    from pyrit.executor.attack import PromptSendingAttack
+    from utils.output_tools import Colors, print_banner, print_divider, print_scorer_comparison
+except ModuleNotFoundError as exc:
+    RUNTIME_IMPORT_ERROR = exc
 
 _LOG = logging.getLogger(__name__)
 
 BASELINE_MAX_SEEDS = int(os.getenv("BASELINE_MAX_SEEDS", "0"))
-BASELINE_REPORT_PATH = Path(os.getenv(
-    "BASELINE_REPORT_PATH",
-    str(ARTIFACTS_ROOT_PATH / "baseline_scan_report.json"),
-))
+if RUNTIME_IMPORT_ERROR is None:
+    BASELINE_REPORT_PATH = Path(os.getenv(
+        "BASELINE_REPORT_PATH",
+        str(ARTIFACTS_ROOT_PATH / "baseline_scan_report.json"),
+    ))
+else:
+    BASELINE_REPORT_PATH = Path(os.getenv("BASELINE_REPORT_PATH", "reports/artifacts/baseline_scan_report.json"))
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -88,20 +104,6 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--dry-run", action="store_true")
     return parser
 
-
-def _default_scorer_payload() -> dict[str, dict[str, object]]:
-    return {
-        "substring": score_to_json_dict(scorer_name="SubStringScorer", score=None),
-        "self_ask_true_false": score_to_json_dict(scorer_name="SelfAskTrueFalseScorer", score=None),
-        "self_ask_scale": score_to_json_dict(scorer_name="SelfAskScaleScorer", score=None),
-        "scale_threshold_0_7": score_to_json_dict(scorer_name="FloatScaleThresholdScorer", score=None),
-        "refusal": score_to_json_dict(scorer_name="SelfAskRefusalScorer", score=None),
-        "compliance_inverted_refusal": score_to_json_dict(
-            scorer_name="TrueFalseInverterScorer", score=None
-        ),
-    }
-
-
 async def run_baseline_suite_async(
     *,
     selected_scenario_ids: set[str] | None,
@@ -113,9 +115,7 @@ async def run_baseline_suite_async(
 ) -> None:
     """Run PromptSendingAttack baseline scan across OWASP scenarios."""
     _LOG.info("Starting baseline scan suite")
-    print(f"\n{'#' * 66}")
-    print("  PyRIT x Ollama -- Baseline Scan (PromptSendingAttack)")
-    print(f"{'#' * 66}")
+    print_banner(title="PyRIT x Ollama -- Baseline Scan (PromptSendingAttack)")
 
     run_paths = build_run_report_paths(run_root=report_root or REPORTS_ROOT_PATH)
 
@@ -128,8 +128,8 @@ async def run_baseline_suite_async(
         if selected_scenario_ids is None or s.owasp_id in selected_scenario_ids
     ]
 
-    print(f"\n  Max seeds/scenario : {max_seeds if max_seeds > 0 else 'unlimited'}")
-    print(f"  Scenarios          : {', '.join(s.owasp_id for s in scenarios_to_run)}")
+    print(f"\n  {Colors.DIM}Max seeds/scenario:{Colors.RESET} {max_seeds if max_seeds > 0 else 'unlimited'}")
+    print(f"  {Colors.DIM}Scenarios         :{Colors.RESET} {', '.join(s.owasp_id for s in scenarios_to_run)}")
 
     if dry_run:
         dry_run_available_datasets: set[str] = set()
@@ -145,7 +145,7 @@ async def run_baseline_suite_async(
             run_all_available_datasets=True,
             max_datasets_per_scenario=0,
         )
-        print("\n[DRY RUN] Execution plan:")
+        print(f"\n{Colors.CYAN}[DRY RUN]{Colors.RESET} Execution plan:")
         grouped: dict[str, list[str]] = {}
         for item in dry_run_plan:
             scenario = cast(OWASPScenario, item["scenario"])
@@ -153,7 +153,7 @@ async def run_baseline_suite_async(
             grouped.setdefault(scenario.owasp_id, []).append(dataset_name)
 
         for scenario_id, datasets in grouped.items():
-            print(f"  - {scenario_id} | datasets: {', '.join(datasets)}")
+            print(f"  {Colors.CYAN}-{Colors.RESET} {scenario_id} | datasets: {', '.join(datasets)}")
         return
 
     await initialize_pyrit_async(memory_db_type=SQLITE, db_path=str(SQLITE_DB_PATH))
@@ -186,10 +186,11 @@ async def run_baseline_suite_async(
         scenario = cast(OWASPScenario, item["scenario"])
         chosen_dataset = cast(str | None, item.get("dataset"))
 
-        print(f"\n{'-' * 66}")
-        print(f"  BASELINE | {scenario.owasp_id} -- {scenario.owasp_name}")
-        print(f"  Dataset  : {chosen_dataset or '(none)'}")
-        print(f"{'-' * 66}")
+        print()
+        print_divider()
+        print(f"  {Colors.HEADER}BASELINE | {scenario.owasp_id} -- {scenario.owasp_name}{Colors.RESET}")
+        print(f"  {Colors.DIM}Dataset :{Colors.RESET} {chosen_dataset or '(none)'}")
+        print_divider()
 
         seeds = memory.get_seeds(dataset_name=chosen_dataset) if chosen_dataset else []
         seed_group_name = str(getattr(seeds[0], "prompt_group_id", "") or "none") if seeds else "none"
@@ -199,7 +200,7 @@ async def run_baseline_suite_async(
 
         if not seed_prompts:
             seed_prompts = [scenario.objective]
-            print("  [!] No seeds found � using scenario objective as single prompt.")
+            print(f"  {Colors.YELLOW}[!]{Colors.RESET} No seeds found; using scenario objective as single prompt.")
 
         scorer = SelfAskTrueFalseScorer(
             chat_target=tf_scorer_target,
@@ -226,7 +227,14 @@ async def run_baseline_suite_async(
                     },
                 )
                 outcome_str = str(result.outcome)
-                print(f"  Prompt: {prompt_text[:60]}...  ? {outcome_str}")
+                prompt_preview = f"{prompt_text[:60]}..."
+                outcome_colored = (
+                    f"{Colors.RED}{outcome_str}{Colors.RESET}"
+                    if "success" in outcome_str.lower() or "achieved" in outcome_str.lower()
+                    else f"{Colors.GREEN}{outcome_str}{Colors.RESET}"
+                )
+                print(f"  {Colors.DIM}Prompt:{Colors.RESET} {prompt_preview}")
+                print(f"  {Colors.DIM}Outcome:{Colors.RESET} {outcome_colored}")
 
                 scorer_json: dict[str, dict[str, object]] = {}
                 try:
@@ -249,7 +257,13 @@ async def run_baseline_suite_async(
                     )
 
                 if not scorer_json:
-                    scorer_json = _default_scorer_payload()
+                    scorer_json = build_default_scorer_payload(score_to_json_dict=score_to_json_dict)
+
+                score_summary: dict[str, object] = {
+                    key: payload.get("score_value")
+                    for key, payload in scorer_json.items()
+                }
+                print_scorer_comparison(comparison=score_summary, title="BASELINE SCORER OUTPUT")
 
                 case_counter += 1
                 export_per_scorer_case_reports(
@@ -295,7 +309,7 @@ async def run_baseline_suite_async(
                     chosen_dataset or "none",
                     time.monotonic() - start_time,
                 )
-                print("  [ERROR] Prompt failed. See logs for details.")
+                print(f"  {Colors.RED}[ERROR]{Colors.RESET} Prompt failed. See logs for details.")
                 case_counter += 1
                 scorer_outputs_rows.append(
                     {
@@ -305,12 +319,16 @@ async def run_baseline_suite_async(
                         "dataset": chosen_dataset or "none",
                         "seed_group": seed_group_name,
                         "error": "baseline_prompt_failed",
-                        "scores": _default_scorer_payload(),
+                        "scores": build_default_scorer_payload(score_to_json_dict=score_to_json_dict),
                     }
                 )
                 failed += 1
 
-        print(f"  Summary: {passed} compliant / {failed} refused out of {len(seed_prompts)} prompts")
+        print(
+            f"  {Colors.CYAN}Summary:{Colors.RESET} "
+            f"{Colors.GREEN}{passed} compliant{Colors.RESET} / "
+            f"{Colors.RED}{failed} refused{Colors.RESET} out of {len(seed_prompts)} prompts"
+        )
         baseline_results.append({
             "owasp_id": scenario.owasp_id,
             "dataset": chosen_dataset or "none",
@@ -321,8 +339,7 @@ async def run_baseline_suite_async(
         })
 
     baseline_report_path = run_paths["run_root"] / "baseline_scan_report.json"
-    baseline_report_path.parent.mkdir(parents=True, exist_ok=True)
-    baseline_report_path.write_text(json.dumps(baseline_results, indent=2), encoding="utf-8")
+    write_json_report(output_path=baseline_report_path, payload=baseline_results)
     export_scorer_outputs_json(rows=scorer_outputs_rows, output_path=run_paths["scorer_outputs_json"])
     export_run_report_json(
         payload={
@@ -342,17 +359,25 @@ async def run_baseline_suite_async(
         },
         output_path=run_paths["run_report_json"],
     )
-    print(f"\n[v] Baseline report written to {baseline_report_path}")
-    print(f"\n{'#' * 66}")
-    print(f"  Baseline scan complete. {len(baseline_results)} scenario(s).")
-    print(f"{'#' * 66}")
+    print(f"\n{Colors.GREEN}[v]{Colors.RESET} Baseline report written to {Colors.CYAN}{baseline_report_path}{Colors.RESET}")
+    print_banner(title=f"Baseline scan complete. {len(baseline_results)} scenario(s).")
 
 
 def main() -> None:
-    configure_runner_logging(level=logging.INFO)
-
     parser = _build_parser()
     args = parser.parse_args()
+
+    if RUNTIME_IMPORT_ERROR is not None:
+        if bool(args.dry_run):
+            print("[DRY-RUN] Baseline scan runner argument parsing succeeded.")
+            print("[DRY-RUN] Runtime attack dependencies are unavailable in this environment.")
+            print(f"[DRY-RUN] Missing module: {RUNTIME_IMPORT_ERROR}")
+            return
+        raise RuntimeError(
+            "Baseline runtime dependencies are unavailable. Install PyRIT components that provide pyrit.executor."
+        ) from RUNTIME_IMPORT_ERROR
+
+    configure_runner_logging(level=logging.INFO)
 
     asyncio.run(
         run_baseline_suite_async(

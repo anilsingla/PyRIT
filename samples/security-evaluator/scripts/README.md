@@ -34,7 +34,7 @@ scripts/
 |   |   +-- xpia_attack_runner.py        Cross-Prompt Injection
 |   |   +-- baseline_scan_runner.py      Default compliance scan
 |   |   +-- batch_rescore_runner.py      Re-score existing DB results
-|   +-- report/
+|   +-- utils/
 |       +-- generate_html_report.py      HTML/Markdown report generator
 +-- analysis/             Result analysis and database import tools
 +-- helper/               Setup and dataset helper scripts
@@ -122,6 +122,9 @@ python app/main.py --datasets ..\my_custom_dataset.prompt
 
 # Run one built-in dataset and one custom dataset file together
 python app/main.py --datasets airt_illegal ..\my_custom_dataset.json
+
+# Run with the included banking-app custom dataset sample
+python app/main.py --datasets custom_datasets/banking_app_security_dataset.json
 ```
 
 If no selectors are passed:
@@ -133,6 +136,8 @@ This generates:
 - `reports/scorer_outputs.json`  - All scorer results
 - `reports/scorer_comparison.csv`  - Comparative analysis
 - `reports/run_report.json`  - Run metadata
+- `reports/report_summary.json`  - Hierarchical dataset->scorer summary + per-test-case execution summary + GUI import rows
+- `reports/all_selection_comparison_report.json`  - Additional dataset/scorer comparison report when all datasets/scorers are used
 - `reports/cases/`  - Per-case JSON reports (hierarchical)
 - `pyrit_ollama_demo.db`  - SQLite database with all results
 
@@ -166,7 +171,10 @@ python query_sqlite_database.py --query scores --filter-scenario LLM01
 ```bash
 python scripts/helper/verification/check_docs_links.py
 python scripts/helper/verification/smoke_test_runner.py
+python scripts/helper/verification/verify_sample_coverage.py
 ```
+
+The coverage verifier validates that scripts support all scorer keys, all-datasets/all-scorers selection, report and log artifact structure, and the included banking custom dataset file.
 ```
 
 ---
@@ -235,6 +243,12 @@ python scripts/helper/verification/smoke_test_runner.py
    ```bash
    python analysis/query_sqlite_database.py --query count
    ```
+
+6. **Import report summary JSON into GUI SQLite (hierarchy + case summaries preserved)**
+  ```bash
+  python analysis/import_scorer_json_to_memory.py \
+    --input-json ../../reports/report_summary.json
+  ```
 
 ---
 
