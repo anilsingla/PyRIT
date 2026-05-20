@@ -80,8 +80,25 @@ def _setup_logging(prefix: str) -> tuple[_DualWriter, object, object]:
     return writer, original_stdout, original_stderr
 
 
+def _print_interrupt_summary(*, label: str, planned: int, executed: int, passed: int, failed: int) -> None:
+    pass_rate = (100.0 * passed / executed) if executed > 0 else 0.0
+    print("\n" + "!" * 66)
+    print(f"{label} PARTIAL EXECUTION SUMMARY (INTERRUPTED)")
+    print("!" * 66)
+    print(f"  Planned Tests:        {planned}")
+    print(f"  Total Tests Executed: {executed}")
+    print(f"  Not Executed:         {max(0, planned - executed)}")
+    print(f"  Passed:               {passed} ({pass_rate:.1f}% of executed)")
+    print(f"  Failed:               {failed}")
+    print()
+
+
 def main() -> int:
     writer, original_stdout, original_stderr = _setup_logging(prefix="banking_tap_attack")
+    planned_tests = 1
+    executed_tests = 0
+    passed_tests = 0
+    failed_tests = 0
     try:
         repo_root = _resolve_repo_root()
         banking_dataset = _resolve_banking_dataset(repo_root)
@@ -97,8 +114,23 @@ def main() -> int:
         print(f"[INFO] Command: {' '.join(cmd)}")
         print(f"[INFO] Working directory: {repo_root}")
         completed = subprocess.run(cmd, cwd=str(repo_root), check=False)
+        executed_tests = 1
+        if completed.returncode == 0:
+            passed_tests = 1
+        else:
+            failed_tests = 1
         print(f"[INFO] Exit code: {completed.returncode}")
         return completed.returncode
+    except KeyboardInterrupt:
+        _print_interrupt_summary(
+            label="TAP WRAPPER",
+            planned=planned_tests,
+            executed=executed_tests,
+            passed=passed_tests,
+            failed=max(failed_tests, executed_tests - passed_tests),
+        )
+        print("[WARN] Interrupted by user")
+        return 130
     finally:
         sys.stdout = original_stdout
         sys.stderr = original_stderr

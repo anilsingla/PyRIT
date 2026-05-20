@@ -91,6 +91,31 @@ except ModuleNotFoundError as exc:
 
 _LOG = logging.getLogger(__name__)
 
+_BASELINE_PROGRESS = {
+    "planned": 0,
+    "executed": 0,
+    "passed": 0,
+    "failed": 0,
+}
+
+
+def _print_interrupt_summary(*, label: str = "BASELINE") -> None:
+    planned = int(_BASELINE_PROGRESS.get("planned", 0))
+    executed = int(_BASELINE_PROGRESS.get("executed", 0))
+    passed = int(_BASELINE_PROGRESS.get("passed", 0))
+    failed = int(_BASELINE_PROGRESS.get("failed", 0))
+    pass_rate = (100.0 * passed / executed) if executed > 0 else 0.0
+
+    print(f"\n{Colors.WARNING}{'!' * 66}{Colors.RESET}")
+    print(f"{Colors.WARNING}{label} PARTIAL EXECUTION SUMMARY (INTERRUPTED){Colors.RESET}")
+    print(f"{Colors.WARNING}{'!' * 66}{Colors.RESET}")
+    print(f"  {Colors.WHITE}Planned Tests:{Colors.RESET}        {planned}")
+    print(f"  {Colors.WHITE}Total Tests Executed:{Colors.RESET} {executed}")
+    print(f"  {Colors.WHITE}Not Executed:{Colors.RESET}         {max(0, planned - executed)}")
+    print(f"  {Colors.WHITE}Passed:{Colors.RESET}               {Colors.GREEN}{passed}{Colors.RESET} ({pass_rate:.1f}% of executed)")
+    print(f"  {Colors.WHITE}Failed:{Colors.RESET}               {Colors.RED}{failed}{Colors.RESET}")
+    print()
+
 BASELINE_MAX_SEEDS = int(os.getenv("BASELINE_MAX_SEEDS", "0"))
 if RUNTIME_IMPORT_ERROR is None:
     BASELINE_REPORT_PATH = Path(os.getenv(
@@ -179,6 +204,10 @@ async def run_baseline_suite_async(
         run_all_available_datasets=True,
         max_datasets_per_scenario=0,
     )
+    _BASELINE_PROGRESS["planned"] = len(execution_plan)
+    _BASELINE_PROGRESS["executed"] = 0
+    _BASELINE_PROGRESS["passed"] = 0
+    _BASELINE_PROGRESS["failed"] = 0
 
     objective_target = build_ollama_target(model_name=OLLAMA_TARGET_MODEL, temperature=0.7)
     tf_scorer_target = build_ollama_target(model_name=OLLAMA_TF_SCORER_MODEL, temperature=0.0)
@@ -357,6 +386,11 @@ async def run_baseline_suite_async(
             "refused": failed,
             "compliance_rate": f"{(passed / len(seed_prompts) * 100):.1f}%" if seed_prompts else "n/a",
         })
+        executed_runs = len(baseline_results)
+        passed_runs = sum(1 for row in baseline_results if int(row.get("refused", 0)) >= int(row.get("compliant", 0)))
+        _BASELINE_PROGRESS["executed"] = executed_runs
+        _BASELINE_PROGRESS["passed"] = passed_runs
+        _BASELINE_PROGRESS["failed"] = max(0, executed_runs - passed_runs)
 
     baseline_report_path = run_paths["run_root"] / "baseline_scan_report.json"
     write_json_report(output_path=baseline_report_path, payload=baseline_results)
@@ -399,15 +433,20 @@ def main() -> None:
 
     configure_runner_logging(level=logging.INFO)
 
-    asyncio.run(
-        run_baseline_suite_async(
-            selected_scenario_ids=parse_token_set(args.scenarios),
-            selected_dataset_names=parse_token_set(args.datasets),
-            selected_scorers=parse_token_set(args.scorers),
-            max_seeds=args.max_seeds,
-            dry_run=bool(args.dry_run),
+    try:
+        asyncio.run(
+            run_baseline_suite_async(
+                selected_scenario_ids=parse_token_set(args.scenarios),
+                selected_dataset_names=parse_token_set(args.datasets),
+                selected_scorers=parse_token_set(args.scorers),
+                max_seeds=args.max_seeds,
+                dry_run=bool(args.dry_run),
+            )
         )
-    )
+    except KeyboardInterrupt:
+        _print_interrupt_summary(label="BASELINE")
+        _LOG.warning("Interrupted by user")
+        sys.exit(130)
 
 
 if __name__ == "__main__":

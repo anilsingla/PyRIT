@@ -1734,6 +1734,52 @@ def _categorize_test(test_num: int) -> str:
         return "Customer Service & Social Engineering"
 
 
+_EXECUTION_PROGRESS = {
+    "planned": 0,
+    "executed": 0,
+    "passed": 0,
+    "failed": 0,
+    "interrupt_summary_printed": False,
+}
+
+
+def _set_execution_progress(*, planned: int | None = None, executed: int | None = None, passed: int | None = None, failed: int | None = None) -> None:
+    """Update shared execution progress counters for interruption-safe reporting."""
+    if planned is not None:
+        _EXECUTION_PROGRESS["planned"] = planned
+    if executed is not None:
+        _EXECUTION_PROGRESS["executed"] = executed
+    if passed is not None:
+        _EXECUTION_PROGRESS["passed"] = passed
+    if failed is not None:
+        _EXECUTION_PROGRESS["failed"] = failed
+
+
+def _print_interrupt_summary_from_progress() -> None:
+    """Print interruption summary once, even if Ctrl+C is raised at multiple layers."""
+    if _EXECUTION_PROGRESS.get("interrupt_summary_printed"):
+        return
+
+    planned_tests = int(_EXECUTION_PROGRESS.get("planned", 0))
+    executed_tests = int(_EXECUTION_PROGRESS.get("executed", 0))
+    passed_tests = int(_EXECUTION_PROGRESS.get("passed", 0))
+    failed_tests = int(_EXECUTION_PROGRESS.get("failed", max(0, executed_tests - passed_tests)))
+    not_executed = max(0, planned_tests - executed_tests)
+    pass_rate = (100 * passed_tests / executed_tests) if executed_tests > 0 else 0.0
+
+    print(f"\n{Colors.WARNING}{'!'*80}{Colors.RESET}")
+    print(f"{Colors.WARNING}PARTIAL EXECUTION SUMMARY (INTERRUPTED){Colors.RESET}")
+    print(f"{Colors.WARNING}{'!'*80}{Colors.RESET}")
+    print(f"  {Colors.WHITE}Planned Tests:{Colors.RESET}               {Colors.BOLD}{planned_tests}{Colors.RESET}")
+    print(f"  {Colors.WHITE}Total Tests Executed:{Colors.RESET}        {Colors.BOLD}{executed_tests}{Colors.RESET}")
+    print(f"  {Colors.WHITE}Not Executed:{Colors.RESET}                {Colors.YELLOW}{not_executed}{Colors.RESET}")
+    print(f"  {Colors.WHITE}Tests Passed (SAFE):{Colors.RESET}         {Colors.GREEN}{passed_tests}{Colors.RESET} ({Colors.GREEN}{pass_rate:.1f}%{Colors.RESET} {Colors.DIM}of executed{Colors.RESET})")
+    print(f"  {Colors.WHITE}Tests Failed (UNSAFE):{Colors.RESET}       {Colors.RED}{failed_tests}{Colors.RESET}")
+    print()
+
+    _EXECUTION_PROGRESS["interrupt_summary_printed"] = True
+
+
 async def run_banking_crescendo_async() -> None:
     """
     Main orchestration function for running Crescendo attacks against banking security threats.
@@ -1753,6 +1799,7 @@ async def run_banking_crescendo_async() -> None:
     # STEP 1: Load custom banking threat dataset
     # Create banking-specific threats targeting financial application security
     banking_seeds = create_banking_threat_dataset()
+    _set_execution_progress(planned=len(banking_seeds), executed=0, passed=0, failed=0)
     _learn_log("main", f"Loaded {len(banking_seeds)} planned tests from dataset.")
 
     # Display loaded banking threats summary
@@ -2051,6 +2098,13 @@ Banking Threat: {seed.value}""",
                 "passed": is_safe,
                 "final_target_response": final_target_response,
             })
+            executed_count = len(test_results)
+            passed_count = sum(1 for r in test_results if r["passed"])
+            _set_execution_progress(
+                executed=executed_count,
+                passed=passed_count,
+                failed=max(0, executed_count - passed_count),
+            )
             
             # Update category statistics
             category_stats[category]["total"] += 1
@@ -2060,22 +2114,12 @@ Banking Threat: {seed.value}""",
             else:
                 category_stats[category]["failed"] += 1
     except KeyboardInterrupt:
-        planned_tests = len(banking_seeds)
-        executed_tests = len(test_results)
-        passed_tests = sum(1 for r in test_results if r["passed"])
-        failed_tests = executed_tests - passed_tests
-        not_executed = max(0, planned_tests - executed_tests)
-        pass_rate = (100 * passed_tests / executed_tests) if executed_tests > 0 else 0.0
-
-        print(f"\n{Colors.WARNING}{'!'*80}{Colors.RESET}")
-        print(f"{Colors.WARNING}PARTIAL EXECUTION SUMMARY (INTERRUPTED){Colors.RESET}")
-        print(f"{Colors.WARNING}{'!'*80}{Colors.RESET}")
-        print(f"  {Colors.WHITE}Planned Tests:{Colors.RESET}               {Colors.BOLD}{planned_tests}{Colors.RESET}")
-        print(f"  {Colors.WHITE}Total Tests Executed:{Colors.RESET}        {Colors.BOLD}{executed_tests}{Colors.RESET}")
-        print(f"  {Colors.WHITE}Not Executed:{Colors.RESET}                {Colors.YELLOW}{not_executed}{Colors.RESET}")
-        print(f"  {Colors.WHITE}Tests Passed (SAFE):{Colors.RESET}         {Colors.GREEN}{passed_tests}{Colors.RESET} ({Colors.GREEN}{pass_rate:.1f}%{Colors.RESET} {Colors.DIM}of executed{Colors.RESET})")
-        print(f"  {Colors.WHITE}Tests Failed (UNSAFE):{Colors.RESET}       {Colors.RED}{failed_tests}{Colors.RESET}")
-        print()
+        _set_execution_progress(
+            executed=len(test_results),
+            passed=sum(1 for r in test_results if r["passed"]),
+            failed=max(0, len(test_results) - sum(1 for r in test_results if r["passed"])),
+        )
+        _print_interrupt_summary_from_progress()
         raise
 
     # ========================================================================
@@ -2268,6 +2312,7 @@ if __name__ == "__main__":
         print(f"{Colors.SUCCESS}{'#'*80}{Colors.RESET}\n")
         
     except KeyboardInterrupt:
+        _print_interrupt_summary_from_progress()
         # Handle user interruption
         print(f"\n{Colors.WARNING}{'!'*80}{Colors.RESET}")
         print(f"{Colors.RED}! SCRIPT INTERRUPTED BY USER{Colors.RESET}")
