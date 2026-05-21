@@ -5,15 +5,18 @@ from __future__ import annotations
 import argparse
 import asyncio
 import logging
+import os
 
 import sys
 from pathlib import Path
 from typing import cast
 
 _APP_ROOT = Path(__file__).resolve().parents[1]
+BANKING_DATASET_PATH = (
+    Path(__file__).resolve().parents[3] / "custom_datasets" / "banking_app_security_dataset.json"
+).resolve()
 _SCRIPTS_ROOT = Path(__file__).resolve().parents[2]
-_REPO_ROOT = Path(__file__).resolve().parents[5]
-for _path in (str(_APP_ROOT), str(_SCRIPTS_ROOT), str(_REPO_ROOT)):
+for _path in (str(_APP_ROOT), str(_SCRIPTS_ROOT)):
     if _path not in sys.path:
         sys.path.insert(0, _path)
 
@@ -61,7 +64,6 @@ try:
         OLLAMA_ENDPOINT,
         OWASPScenario,
         OWASP_SCENARIOS,
-        RedTeamingAttack,
         REPORTS_ROOT_PATH,
         RESUME_INCOMPLETE_RUN,
         RUN_ALL_AVAILABLE_DATASETS,
@@ -81,6 +83,7 @@ try:
         initialize_pyrit_async,
         validate_ollama_endpoint,
     )
+    from compat_runtime import RedTeamingAttack
     from redteam_runner.reporting_ops import (
         append_production_log,
         build_run_report_paths,
@@ -982,6 +985,18 @@ def _build_parser() -> argparse.ArgumentParser:
     return parser
 
 
+def _resolve_dataset_selection(*, cli_values: list[str]) -> set[str]:
+    cli_tokens = parse_token_set(cli_values)
+    if cli_tokens:
+        return cli_tokens
+
+    env_tokens = parse_token_set([os.getenv("PYRIT_DEFAULT_DATASETS", "")])
+    if env_tokens:
+        return env_tokens
+
+    return {str(BANKING_DATASET_PATH)}
+
+
 def main() -> None:
     """Standalone CLI entry point with dual output logging."""
     parser = _build_parser()
@@ -1006,10 +1021,11 @@ def main() -> None:
     sys.stderr = dual_writer
 
     try:
+        selected_dataset_tokens = _resolve_dataset_selection(cli_values=args.datasets)
         asyncio.run(
             run_redteam_suite_async(
                 selected_converters=parse_token_set(args.converters),
-                selected_dataset_tokens=parse_token_set(args.datasets),
+                selected_dataset_tokens=selected_dataset_tokens,
                 selected_scorers=parse_token_set(args.scorers),
                 dry_run=bool(args.dry_run),
                 local_datasets_only=bool(args.local_datasets_only),

@@ -32,8 +32,7 @@ from typing import cast
 
 _APP_ROOT = Path(__file__).resolve().parents[1]
 _SCRIPTS_ROOT = Path(__file__).resolve().parents[2]
-_REPO_ROOT = Path(__file__).resolve().parents[5]
-for _path in (str(_APP_ROOT), str(_SCRIPTS_ROOT), str(_REPO_ROOT)):
+for _path in (str(_APP_ROOT), str(_SCRIPTS_ROOT)):
     if _path not in sys.path:
         sys.path.insert(0, _path)
 
@@ -41,7 +40,7 @@ RUNTIME_IMPORT_ERROR: ModuleNotFoundError | None = None
 
 try:
     from redteam_runner.converter_ops import build_ollama_target
-    from redteam_runner.dataset_ops import build_execution_plan, sync_dataset_to_memory_async
+    from redteam_runner.dataset_ops import build_execution_plan, load_seed_dataset_from_path, sync_dataset_to_memory_async
     from redteam_runner.env_config import (
         AttackScoringConfig,
         REPORTS_ROOT_PATH,
@@ -77,7 +76,7 @@ try:
     from redteam_runner.cli_utils import parse_token_set
     from reports import write_json_report
     from scorer import build_default_scorer_payload
-    from pyrit.executor.attack import PromptSendingAttack
+    from compat_runtime import PromptSendingAttack
     from utils.output_tools import (
         ENABLE_LIVE_SCORER_FEED,
         Colors,
@@ -90,6 +89,9 @@ except ModuleNotFoundError as exc:
     RUNTIME_IMPORT_ERROR = exc
 
 _LOG = logging.getLogger(__name__)
+BANKING_DATASET_PATH = (
+    Path(__file__).resolve().parents[3] / "custom_datasets" / "banking_app_security_dataset.json"
+).resolve()
 
 _BASELINE_PROGRESS = {
     "planned": 0,
@@ -135,6 +137,18 @@ def _build_parser() -> argparse.ArgumentParser:
                         help="Maximum seeds per scenario (0 = unlimited).")
     parser.add_argument("--dry-run", action="store_true")
     return parser
+
+
+def _resolve_dataset_selection(*, cli_values: list[str]) -> set[str]:
+    cli_tokens = parse_token_set(cli_values)
+    if cli_tokens:
+        return cli_tokens
+
+    env_tokens = parse_token_set([os.getenv("PYRIT_DEFAULT_DATASETS", "")])
+    if env_tokens:
+        return env_tokens
+
+    return {str(BANKING_DATASET_PATH)}
 
 async def run_baseline_suite_async(
     *,
@@ -191,11 +205,32 @@ async def run_baseline_suite_async(
     await initialize_pyrit_async(memory_db_type=SQLITE, db_path=str(SQLITE_DB_PATH))
     memory = CentralMemory.get_memory_instance()
 
-    all_datasets: list[SeedDataset] = await SeedDatasetProvider.fetch_datasets_async(max_concurrency=4)
     available_datasets: set[str] = set()
-    for dataset in all_datasets:
-        await sync_dataset_to_memory_async(memory=memory, dataset=dataset, added_by="baseline_runner")
-        available_datasets.add(dataset.dataset_name or "unknown_dataset")
+
+    # If datasets are explicitly provided, avoid remote provider fetches.
+    if selected_dataset_names:
+        selected_dataset_names = set(selected_dataset_names)
+        local_dataset_paths = [
+            Path(token).expanduser().resolve()
+            for token in selected_dataset_names
+            if Path(token).expanduser().exists()
+        ]
+
+        for dataset_path in local_dataset_paths:
+            dataset = load_seed_dataset_from_path(input_path=dataset_path)
+            await sync_dataset_to_memory_async(memory=memory, dataset=dataset, added_by="baseline_runner")
+            available_datasets.add(dataset.dataset_name or "unknown_dataset")
+
+        if available_datasets:
+            selected_dataset_names = set(available_datasets)
+        else:
+            available_datasets = set(selected_dataset_names)
+            _LOG.info("Using explicit dataset selection without provider fetch: %s", sorted(available_datasets))
+    else:
+        all_datasets: list[SeedDataset] = await SeedDatasetProvider.fetch_datasets_async(max_concurrency=4)
+        for dataset in all_datasets:
+            await sync_dataset_to_memory_async(memory=memory, dataset=dataset, added_by="baseline_runner")
+            available_datasets.add(dataset.dataset_name or "unknown_dataset")
 
     execution_plan = build_execution_plan(
         scenarios=scenarios_to_run,
@@ -422,22 +457,22 @@ def main() -> None:
     args = parser.parse_args()
 
     if RUNTIME_IMPORT_ERROR is not None:
-        if bool(args.dry_run):
-            print("[DRY-RUN] Baseline scan runner argument parsing succeeded.")
-            print("[DRY-RUN] Runtime attack dependencies are unavailable in this environment.")
-            print(f"[DRY-RUN] Missing module: {RUNTIME_IMPORT_ERROR}")
-            return
-        raise RuntimeError(
-            "Baseline runtime dependencies are unavailable. Install PyRIT components that provide pyrit.executor."
-        ) from RUNTIME_IMPORT_ERROR
+        if not bool(args.dry_run):
+            print("[WARN] Runtime attack dependencies are unavailable; forcing dry-run output only.")
+            print("[WARN] Re-run from samples/pyrit_baseline_attack.py for wrapper-based fallback behavior.")
+        print("[DRY-RUN] Baseline scan runner argument parsing succeeded.")
+        print("[DRY-RUN] Runtime attack dependencies are unavailable in this environment.")
+        print(f"[DRY-RUN] Missing module: {RUNTIME_IMPORT_ERROR}")
+        return
 
     configure_runner_logging(level=logging.INFO)
 
     try:
+        selected_dataset_names = _resolve_dataset_selection(cli_values=args.datasets)
         asyncio.run(
             run_baseline_suite_async(
                 selected_scenario_ids=parse_token_set(args.scenarios),
-                selected_dataset_names=parse_token_set(args.datasets),
+                selected_dataset_names=selected_dataset_names,
                 selected_scorers=parse_token_set(args.scorers),
                 max_seeds=args.max_seeds,
                 dry_run=bool(args.dry_run),

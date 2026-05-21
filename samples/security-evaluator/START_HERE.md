@@ -29,7 +29,7 @@ Recommended Python version for local installs: 3.11 or 3.12.
 
 If you want one guided installer, use:
 ```bash
-python scripts/installers/install_security-evaluator.py
+python scripts/installers/install_security_evaluator.py
 ```
 
 The installer can also generate API service wrapper files for Windows, Linux, and macOS,

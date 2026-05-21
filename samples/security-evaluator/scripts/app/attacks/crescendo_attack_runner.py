@@ -26,8 +26,7 @@ from typing import cast
 
 _APP_ROOT = Path(__file__).resolve().parents[1]
 _SCRIPTS_ROOT = Path(__file__).resolve().parents[2]
-_REPO_ROOT = Path(__file__).resolve().parents[5]
-for _path in (str(_APP_ROOT), str(_SCRIPTS_ROOT), str(_REPO_ROOT)):
+for _path in (str(_APP_ROOT), str(_SCRIPTS_ROOT)):
     if _path not in sys.path:
         sys.path.insert(0, _path)
 
@@ -87,6 +86,9 @@ except ModuleNotFoundError as exc:
     RUNTIME_IMPORT_ERROR = exc
 
 _LOG = logging.getLogger(__name__)
+BANKING_DATASET_PATH = (
+    Path(__file__).resolve().parents[3] / "custom_datasets" / "banking_app_security_dataset.json"
+).resolve()
 
 CRESCENDO_MAX_BACKTRACKS: int = int(os.getenv("CRESCENDO_MAX_BACKTRACKS", "5"))
 if RUNTIME_IMPORT_ERROR is None:
@@ -108,6 +110,18 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--max-turns", type=int, default=CRESCENDO_MAX_TURNS)
     parser.add_argument("--dry-run", action="store_true", help="Print plan without executing attacks.")
     return parser
+
+
+def _resolve_dataset_selection(*, cli_values: list[str]) -> set[str]:
+    cli_tokens = parse_token_set(cli_values)
+    if cli_tokens:
+        return cli_tokens
+
+    env_tokens = parse_token_set([os.getenv("PYRIT_DEFAULT_DATASETS", "")])
+    if env_tokens:
+        return env_tokens
+
+    return {str(BANKING_DATASET_PATH)}
 
 
 async def run_crescendo_suite_async(
@@ -323,10 +337,11 @@ def main() -> None:
     sys.stderr = dual_writer
 
     try:
+        selected_dataset_names = _resolve_dataset_selection(cli_values=args.datasets)
         asyncio.run(
             run_crescendo_suite_async(
                 selected_scenario_ids=parse_token_set(args.scenarios),
-                selected_dataset_names=parse_token_set(args.datasets),
+                selected_dataset_names=selected_dataset_names,
                 selected_scorers=parse_token_set(args.scorers),
                 max_backtracks=args.max_backtracks,
                 max_turns=args.max_turns,

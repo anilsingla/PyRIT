@@ -92,7 +92,7 @@ Controls where PyRIT stores conversation history, artifacts, and scores.
 
 | Variable | Default | Purpose |
 |----------|---------|---------|
-| `PYRIT_SQLITE_DB_PATH` | `reports/pyrit_ollama_demo.db` | Main PyRIT database file (relative to repo root) |
+| `PYRIT_SQLITE_DB_PATH` | `reports/pyrit_ollama_demo.db` | Main PyRIT database file (relative to `samples/security-evaluator`) |
 
 **Important**: In Docker, this path is absolute: `/workspace/samples/security-evaluator/reports/pyrit_ollama_demo.db` (via volume mount)
 

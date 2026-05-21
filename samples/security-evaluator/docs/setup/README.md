@@ -13,7 +13,7 @@ Select your preferred setup method:
 1. Use [Local Installation](local_setup.md) first.
 2. Run one baseline execution: `python scripts/app/main.py`.
 3. Review results in `reports/` (CSV/JSON) or open the JupyterLab notebook.
-4. If you want a guided install, run `python scripts/installers/install_security-evaluator.py` from `samples/security-evaluator/`.
+4. If you want a guided install, run `python scripts/installers/install_security_evaluator.py` from `samples/security-evaluator/`.
 5. *(Optional)* Open [GUI Tutorial](gui_setup.md) if you want interactive GUI analysis.
 
 The guided installer now also supports generating API service wrapper files for Linux/macOS/Windows,

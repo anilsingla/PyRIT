@@ -7,14 +7,13 @@ from typing import Any
 
 
 SAMPLE_DIR = Path(__file__).resolve().parents[2]
-REPO_ROOT = SAMPLE_DIR.parents[1]
 DEFAULT_ENV_FILE = SAMPLE_DIR / ".env.local"
 DEFAULT_PYRIT_CONFIG_FILE = SAMPLE_DIR / ".pyrit_config"
 API_REQUIREMENTS_FILE = SAMPLE_DIR / "api" / "requirements.txt"
 WINDOWS_SERVICE_INSTALL_SCRIPT = SAMPLE_DIR / "scripts" / "installers" / "app_service" / "windows" / "install_service.ps1"
 LINUX_SERVICE_TEMPLATE = SAMPLE_DIR / "scripts" / "installers" / "app_service" / "linux" / "pyrit-redteam-api.service"
 MAC_SERVICE_TEMPLATE = SAMPLE_DIR / "scripts" / "installers" / "app_service" / "macos" / "com.pyrit.redteam.api.plist"
-DOCKER_COMPOSE_FILE = REPO_ROOT / "docker" / "docker-compose.yaml"
+DOCKER_COMPOSE_FILE = SAMPLE_DIR / "docker-compose.yaml"
 
 COMMON_PYTHON_PACKAGES = ["pyrit", "sqlalchemy", "pyyaml"]
 

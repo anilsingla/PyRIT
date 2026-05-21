@@ -11,7 +11,7 @@ Use this folder if you want either:
 Run the interactive installer from `samples/security-evaluator/`:
 
 ```bash
-python scripts/installers/install_security-evaluator.py
+python scripts/installers/install_security_evaluator.py
 ```
 
 What it can do in one flow:
@@ -120,7 +120,7 @@ python scripts/installers/platform_installers.py --install sqlite --platform lin
 
 ## Internal Orchestration Modules
 
-- `setup_wizard.py`: main orchestration logic used by `install_security-evaluator.py`
+- `setup_wizard.py`: main orchestration logic used by `install_security_evaluator.py`
 - `menu.py`: interactive prompt collection
 - `configuration.py`: `.env.local` and `.pyrit_config` file writing/validation
 - `services.py`: API service wrapper generation/install logic

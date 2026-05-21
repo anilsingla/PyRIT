@@ -176,7 +176,11 @@ async def run_attack_mode_async(
     if attack_mode == "xpia":
         from attacks.xpia_attack_runner import run_xpia_suite_async
 
-        await run_xpia_suite_async(selected_scenario_ids=selected_scenario_ids, dry_run=dry_run)
+        await run_xpia_suite_async(
+            selected_scenario_ids=selected_scenario_ids,
+            selected_dataset_tokens=selected_dataset_tokens,
+            dry_run=dry_run,
+        )
         return _maybe_generate_report(
             should_generate_report=should_generate_report,
             run_paths=run_paths,

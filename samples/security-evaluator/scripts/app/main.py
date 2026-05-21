@@ -35,6 +35,9 @@ from utils.output_tools import setup_logging
 _LOG = logging.getLogger(__name__)
 
 ATTACK_MODES = ("redteam", "tap", "crescendo", "xpia", "baseline", "rescore", "report")
+BANKING_DATASET_PATH = (
+  Path(__file__).resolve().parents[2] / "custom_datasets" / "banking_app_security_dataset.json"
+).resolve()
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -467,7 +470,6 @@ def main() -> None:
         datefmt="%H:%M:%S",
         force=True,
       )
-      _LOG.warning("Falling back to basic logging because redteam env configuration could not be loaded.")
 
     def _env_bool(*, name: str, default: bool) -> bool:
         value = os.getenv(name)
@@ -492,7 +494,11 @@ def main() -> None:
     selected_dataset_tokens = (
         None
         if use_all_datasets
-        else _tokens(values=args.datasets, env_var="PYRIT_DEFAULT_DATASETS", default_literal="harmbench")
+      else _tokens(
+        values=args.datasets,
+        env_var="PYRIT_DEFAULT_DATASETS",
+        default_literal=str(BANKING_DATASET_PATH),
+      )
     )
     selected_scorers = (
         None

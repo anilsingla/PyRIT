@@ -25,8 +25,8 @@ Set-Location samples/security-evaluator
 
 ```bash
 cd docker
-docker-compose up -d
-docker-compose exec pyrit bash
+docker compose -f ../samples/security-evaluator/docker-compose.yaml up -d
+docker compose -f ../samples/security-evaluator/docker-compose.yaml exec copyrit bash
 cd samples/security-evaluator
 ```
 
@@ -77,7 +77,7 @@ python scripts/app/attacks/baseline_scan_runner.py --scenarios LLM01 --dry-run
 python scripts/app/attacks/batch_rescore_runner.py --dry-run
 ```
 
-If your environment does not yet include full attack runtime modules, these commands still validate parser/dry-run paths and report a clear dependency message (for example missing `pyrit.executor`).
+These smoke commands validate parser wiring, mode dispatch, and dry-run planning without sending prompts.
 
 **Run the standalone RedTeam runner (dual screen+file logs):**
 

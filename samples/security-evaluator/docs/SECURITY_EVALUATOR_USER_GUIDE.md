@@ -197,27 +197,23 @@ Copy-Item config/.pyrit_config.example .pyrit_config
 1. Open a terminal on your Docker host.
 2. Navigate to the repository root.
 
-```bash
-cd docker
-```
-
 3. Start the containers:
 
 ```bash
-docker-compose up -d
+docker compose -f samples/security-evaluator/docker-compose.yaml up -d
 ```
 
 4. Enter the PyRIT container shell:
 
 ```bash
-docker-compose exec pyrit bash
+docker compose -f samples/security-evaluator/docker-compose.yaml exec copyrit bash
 ```
 
 5. From inside the container:
 
 ```bash
 cd samples/security-evaluator
-python app/main.py --dry-run
+python scripts/app/main.py --dry-run
 ```
 
 For details: [Docker setup](./setup/docker_setup.md)
@@ -562,7 +558,7 @@ python pyrit_gui.py
 
 ### Docker GUI setup
 
-Use the existing Docker compose definition from `docker/docker-compose.yaml`.
+Use the existing Docker compose definition from `samples/security-evaluator/docker-compose.yaml`.
 If Ollama runs on the host, set the endpoint inside the container:
 
 ```yaml

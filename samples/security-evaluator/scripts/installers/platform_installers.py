@@ -21,7 +21,7 @@ import shutil
 import sys
 
 from .commands import detect_package_manager, run_command
-from .constants import API_REQUIREMENTS_FILE, COMMON_PYTHON_PACKAGES, DOCKER_COMPOSE_FILE, REPO_ROOT
+from .constants import API_REQUIREMENTS_FILE, COMMON_PYTHON_PACKAGES, DOCKER_COMPOSE_FILE, SAMPLE_DIR
 
 
 def install_python_packages(*, python_exe: str) -> None:
@@ -159,10 +159,10 @@ def print_local_integration_steps(*, python_exe: str) -> None:
     print("2) Verify Ollama endpoint: curl http://localhost:11434/api/tags")
     print("3) Launch Jupyter Lab:")
     print(f"   {python_exe} -m jupyter lab")
-    print("4) Launch PyRIT GUI:")
-    print(f"   cd {REPO_ROOT / 'doc' / 'code'}")
-    print(f"   {python_exe} pyrit_gui.py")
-    print("5) Ensure GUI reads SQLite path from .env.local (PYRIT_SQLITE_DB_PATH).")
+    print("4) Run the security-evaluator main workflow:")
+    print(f"   cd {SAMPLE_DIR / 'scripts'}")
+    print(f"   {python_exe} app/main.py --dry-run --local-datasets-only")
+    print("5) Ensure scripts read SQLite path from .env.local (PYRIT_SQLITE_DB_PATH).")
 
 
 def _build_cli_parser() -> argparse.ArgumentParser:

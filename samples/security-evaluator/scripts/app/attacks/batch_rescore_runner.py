@@ -31,8 +31,7 @@ from typing import Any, cast
 
 _APP_ROOT = Path(__file__).resolve().parents[1]
 _SCRIPTS_ROOT = Path(__file__).resolve().parents[2]
-_REPO_ROOT = Path(__file__).resolve().parents[5]
-for _path in (str(_APP_ROOT), str(_SCRIPTS_ROOT), str(_REPO_ROOT)):
+for _path in (str(_APP_ROOT), str(_SCRIPTS_ROOT)):
     if _path not in sys.path:
         sys.path.insert(0, _path)
 

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import importlib
+import json
 import logging
 import os
 import pathlib
@@ -69,15 +70,29 @@ def ensure_packages_available(*, packages: list[str]) -> None:
 
 ensure_packages_available(packages=REQUIRED_PACKAGES)
 
-from pyrit.executor.attack import (
+from redteam_runner.compat_runtime import (
+    SQLITE,
     AttackAdversarialConfig,
     AttackConverterConfig,
+    AttackOutcome,
     AttackScoringConfig,
+    BatchScorer,
+    CentralMemory,
     ConsoleAttackResultPrinter,
+    FloatScaleThresholdScorer,
+    Message,
+    MessagePiece,
     RedTeamingAttack,
+    Score,
+    SeedDataset,
+    SelfAskRefusalScorer,
+    SelfAskScaleScorer,
+    SelfAskTrueFalseScorer,
+    SubStringScorer,
+    TrueFalseInverterScorer,
+    TrueFalseQuestion,
+    initialize_pyrit_async,
 )
-from pyrit.memory import CentralMemory
-from pyrit.models import AttackOutcome, Message, MessagePiece, Score, SeedDataset
 from pyrit.prompt_converter import (
     AtbashConverter,
     Base64Converter,
@@ -95,19 +110,9 @@ from pyrit.prompt_converter import (
     UnicodeConfusableConverter,
     VariationConverter,
 )
-from pyrit.prompt_normalizer import PromptConverterConfiguration
+from redteam_runner.compat_runtime import PromptConverterConfiguration
 from pyrit.prompt_target import OpenAIChatTarget
-from pyrit.score import (
-    BatchScorer,
-    FloatScaleThresholdScorer,
-    SelfAskRefusalScorer,
-    SelfAskScaleScorer,
-    SelfAskTrueFalseScorer,
-    SubStringScorer,
-    TrueFalseInverterScorer,
-    TrueFalseQuestion,
-)
-from pyrit.setup import SQLITE, initialize_pyrit_async
+# Scorer and setup symbols are provided by redteam_runner.compat_runtime.
 
 try:
     from pyrit.datasets import SeedDatasetProvider  # type: ignore[attr-defined]
@@ -118,13 +123,13 @@ except Exception:
         Provides a minimal provider over local files under `pyrit/datasets`.
         """
 
-        _DATASET_ROOT = pathlib.Path(__file__).resolve().parents[4] / "pyrit" / "datasets"
+        _DATASET_ROOT = pathlib.Path(__file__).resolve().parents[3] / "custom_datasets"
 
         @classmethod
         def _iter_dataset_files(cls) -> list[pathlib.Path]:
             if not cls._DATASET_ROOT.exists():
                 return []
-            patterns = ("*.prompt", "*.yaml", "*.yml")
+            patterns = ("*.prompt", "*.yaml", "*.yml", "*.json")
             files: list[pathlib.Path] = []
             for pattern in patterns:
                 files.extend(cls._DATASET_ROOT.rglob(pattern))
@@ -143,7 +148,11 @@ except Exception:
             datasets: list[SeedDataset] = []
             for file_path in cls._iter_dataset_files():
                 try:
-                    dataset = SeedDataset.from_yaml_file(str(file_path))
+                    if file_path.suffix.lower() == ".json":
+                        payload = json.loads(file_path.read_text(encoding="utf-8"))
+                        dataset = SeedDataset.from_dict(payload)
+                    else:
+                        dataset = SeedDataset.from_yaml_file(str(file_path))
                 except Exception:
                     continue
                 datasets.append(dataset)

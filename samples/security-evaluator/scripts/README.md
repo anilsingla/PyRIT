@@ -97,38 +97,38 @@ python scripts/helper/verification/validate_redteam_config.py --fix
 
 ### Phase 1: Setup (run once)
 ```bash
+cd samples/security-evaluator
+
 # Linux/macOS
-cd scripts/installers
-bash setup_sqlite_linux.sh
+bash scripts/installers/setup_sqlite_linux.sh
 
 # Windows
-cd scripts\installers
-.\setup_sqlite_windows.ps1
+scripts\installers\setup_sqlite_windows.ps1
 ```
 
 ### Phase 2: Run Red Team Attack
 ```bash
-cd ../../  # Back to scripts/
-python app/main.py
+cd samples/security-evaluator
+python scripts/app/main.py
 ```
 
 Selection examples:
 ```bash
 # Run only specific converter / dataset / scorer choices
-python app/main.py --converters base64 rot13 --datasets airt_illegal --scorers substring self_ask_true_false
+python scripts/app/main.py --converters base64 rot13 --datasets custom_datasets/banking_app_security_dataset.json --scorers substring self_ask_true_false
 
 # Use a custom dataset file if a requested dataset is not built into PyRIT
-python app/main.py --datasets ..\my_custom_dataset.prompt
+python scripts/app/main.py --datasets ..\my_custom_dataset.prompt
 
 # Run one built-in dataset and one custom dataset file together
-python app/main.py --datasets airt_illegal ..\my_custom_dataset.json
+python scripts/app/main.py --datasets custom_datasets/banking_app_security_dataset.json ..\my_custom_dataset.json
 
 # Run with the included banking-app custom dataset sample
-python app/main.py --datasets custom_datasets/banking_app_security_dataset.json
+python scripts/app/main.py --datasets custom_datasets/banking_app_security_dataset.json
 ```
 
 If no selectors are passed:
-- datasets default to `harmbench`
+- datasets default to `custom_datasets/banking_app_security_dataset.json`
 - scorers default to `self_ask_true_false`
 - converters use each scenario's default mapped converter
 
@@ -139,7 +139,7 @@ This generates:
 - `reports/report_summary.json`  - Hierarchical dataset->scorer summary + per-test-case execution summary + GUI import rows
 - `reports/all_selection_comparison_report.json`  - Additional dataset/scorer comparison report when all datasets/scorers are used
 - `reports/cases/`  - Per-case JSON reports (hierarchical)
-- `pyrit_ollama_demo.db`  - SQLite database with all results
+- `reports/pyrit_ollama_demo.db`  - SQLite database with all results
 
 ### Phase 3: Analyze Results
 
@@ -147,13 +147,12 @@ This generates:
 
 **Option B: GUI analysis** *(optional — not required by the unified container workflow)*
 ```bash
-cd ../docs/setup
-# Follow gui_setup.md to launch PyRIT GUI
+# Follow docs/setup/gui_setup.md for optional GUI analysis setup
 ```
 
 **Option C: Command-line analysis**
 ```bash
-cd ../analysis
+cd samples/security-evaluator/scripts/analysis
 
 # View summary statistics
 python analyze_json_reports.py --input-dir ../../reports/cases
@@ -166,16 +165,17 @@ python query_sqlite_database.py --query count
 
 # Get scores for specific scenario
 python query_sqlite_database.py --query scores --filter-scenario LLM01
+```
 
-**Option C: Quick sanity checks**
+**Option D: Quick sanity checks**
 ```bash
+cd samples/security-evaluator
 python scripts/helper/verification/check_docs_links.py
 python scripts/helper/verification/smoke_test_runner.py
 python scripts/helper/verification/verify_sample_coverage.py
 ```
 
 The coverage verifier validates that scripts support all scorer keys, all-datasets/all-scorers selection, report and log artifact structure, and the included banking custom dataset file.
-```
 
 ---
 

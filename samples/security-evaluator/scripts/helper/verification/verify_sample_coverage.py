@@ -17,8 +17,7 @@ from pathlib import Path
 from typing import Any
 
 
-REPO_ROOT = Path(__file__).resolve().parents[5]
-SAMPLE_ROOT = REPO_ROOT / "samples" / "security-evaluator"
+SAMPLE_ROOT = Path(__file__).resolve().parents[3]
 MAIN_PY = SAMPLE_ROOT / "scripts" / "app" / "main.py"
 SCORING_OPS_PY = SAMPLE_ROOT / "scripts" / "app" / "redteam_runner" / "scoring_ops.py"
 REPORTING_OPS_PY = SAMPLE_ROOT / "scripts" / "app" / "redteam_runner" / "reporting_ops.py"
@@ -177,7 +176,7 @@ def run_verification() -> dict[str, Any]:
             "banking_custom_dataset": {
                 "ok": banking_ok,
                 "message": banking_message,
-                "path": str(BANKING_DATASET_JSON.relative_to(REPO_ROOT)),
+                "path": str(BANKING_DATASET_JSON.relative_to(SAMPLE_ROOT)),
             },
         },
     }

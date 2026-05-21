@@ -16,22 +16,23 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import json
 import logging
+import os
 import sys
 import time
 from pathlib import Path
 
 _APP_ROOT = Path(__file__).resolve().parents[1]
 _SCRIPTS_ROOT = Path(__file__).resolve().parents[2]
-_REPO_ROOT = Path(__file__).resolve().parents[5]
-for _path in (str(_APP_ROOT), str(_SCRIPTS_ROOT), str(_REPO_ROOT)):
+for _path in (str(_APP_ROOT), str(_SCRIPTS_ROOT)):
     if _path not in sys.path:
         sys.path.insert(0, _path)
 
 RUNTIME_IMPORT_ERROR: ModuleNotFoundError | None = None
 
 try:
-    from pyrit.executor.workflow import XPIAContext, XPIATestWorkflow
+    from compat_runtime import XPIAContext, XPIATestWorkflow
     from pyrit.models import Message, MessagePiece
     from redteam_runner.cli_utils import parse_token_set
     from redteam_runner.converter_ops import build_ollama_target
@@ -56,6 +57,9 @@ except ModuleNotFoundError as exc:
 _LOG = logging.getLogger(__name__)
 
 XPIA_DEFAULT_SCENARIO_IDS: set[str] = {"LLM02", "LLM08"}
+BANKING_DATASET_PATH = (
+    Path(__file__).resolve().parents[3] / "custom_datasets" / "banking_app_security_dataset.json"
+).resolve()
 
 
 def _print_interrupt_summary(*, planned: int, executed: int, passed: int, failed: int, label: str) -> None:
@@ -77,8 +81,50 @@ def _build_parser() -> argparse.ArgumentParser:
         description="Run XPIA (Cross-Prompt Injection Attack) against selected OWASP scenarios."
     )
     parser.add_argument("--scenarios", nargs="*", default=[], help="OWASP IDs to run (default: LLM02 LLM08).")
+    parser.add_argument("--datasets", nargs="*", default=[], help="Dataset file paths (defaults to banking dataset).")
     parser.add_argument("--dry-run", action="store_true", help="Print plan without executing.")
     return parser
+
+
+def _resolve_dataset_selection(*, cli_values: list[str]) -> set[str]:
+    cli_tokens = parse_token_set(cli_values)
+    if cli_tokens:
+        return cli_tokens
+
+    env_tokens = parse_token_set([os.getenv("PYRIT_DEFAULT_DATASETS", "")])
+    if env_tokens:
+        return env_tokens
+
+    from_env = os.getenv("BANKING_DATASET_PATH", "").strip()
+    if from_env:
+        return {from_env}
+
+    return {str(BANKING_DATASET_PATH)}
+
+
+def _resolve_dataset_file(*, dataset_tokens: set[str] | None) -> Path:
+    if dataset_tokens:
+        first_token = sorted(dataset_tokens)[0]
+        return Path(first_token).expanduser().resolve()
+
+    from_env = os.getenv("BANKING_DATASET_PATH", "").strip()
+    if from_env:
+        return Path(from_env).expanduser().resolve()
+
+    return BANKING_DATASET_PATH
+
+
+def _load_seed_values(*, dataset_path: Path) -> list[str]:
+    payload = json.loads(dataset_path.read_text(encoding="utf-8"))
+    seeds = payload.get("seeds", [])
+    values: list[str] = []
+    if isinstance(seeds, list):
+        for row in seeds:
+            if isinstance(row, dict):
+                value = str(row.get("value", "")).strip()
+                if value:
+                    values.append(value)
+    return values
 
 
 def _build_xpia_payload(*, objective: str) -> Message:
@@ -107,7 +153,12 @@ def _build_xpia_payload(*, objective: str) -> Message:
     )
 
 
-async def run_xpia_suite_async(*, selected_scenario_ids: set[str] | None, dry_run: bool) -> None:
+async def run_xpia_suite_async(
+    *,
+    selected_scenario_ids: set[str] | None,
+    selected_dataset_tokens: set[str] | None,
+    dry_run: bool,
+) -> None:
     """Run XPIA suite.
 
     Args:
@@ -130,13 +181,26 @@ async def run_xpia_suite_async(*, selected_scenario_ids: set[str] | None, dry_ru
         _LOG.warning("No matching XPIA scenarios for selection: %s", effective_ids)
         return
 
+    dataset_path = _resolve_dataset_file(dataset_tokens=selected_dataset_tokens)
+    seed_values: list[str] = []
+    if dataset_path.exists():
+        try:
+            seed_values = _load_seed_values(dataset_path=dataset_path)
+        except Exception:
+            _LOG.exception("Failed to read XPIA dataset file: %s", dataset_path)
+            seed_values = []
+
     print(f"\n  {Colors.DIM}Running XPIA on:{Colors.RESET} {', '.join(s.owasp_id for s in scenarios_to_run)}")
+    print(f"  {Colors.DIM}Dataset file   :{Colors.RESET} {dataset_path}")
 
     if dry_run:
         print(f"\n{Colors.CYAN}[DRY RUN]{Colors.RESET} Execution plan:")
         for scenario in scenarios_to_run:
             print(f"  {Colors.CYAN}-{Colors.RESET} {scenario.owasp_id} ({scenario.owasp_name})")
-            print(f"    {Colors.DIM}Injected objective:{Colors.RESET} {scenario.objective[:80]} ...")
+            if seed_values:
+                print(f"    {Colors.DIM}Injected objective:{Colors.RESET} {seed_values[0][:80]} ...")
+            else:
+                print(f"    {Colors.DIM}Injected objective:{Colors.RESET} {scenario.objective[:80]} ...")
         return
 
     await initialize_pyrit_async(memory_db_type=SQLITE, db_path=str(SQLITE_DB_PATH))
@@ -169,11 +233,13 @@ async def run_xpia_suite_async(*, selected_scenario_ids: set[str] | None, dry_ru
                 scorer=scorer,
             )
 
+            injected_objective = seed_values[(index - 1) % len(seed_values)] if seed_values else scenario.objective
             context = XPIAContext(
-                attack_content=_build_xpia_payload(objective=scenario.objective),
+                attack_content=_build_xpia_payload(objective=injected_objective),
                 memory_labels={
                     "owasp_id": scenario.owasp_id,
                     "attack_mode": "xpia",
+                    "dataset": dataset_path.name if dataset_path else "none",
                 },
             )
 
@@ -253,7 +319,14 @@ def main() -> None:
     configure_runner_logging(level=logging.INFO)
 
     try:
-        asyncio.run(run_xpia_suite_async(selected_scenario_ids=parse_token_set(args.scenarios), dry_run=bool(args.dry_run)))
+        selected_dataset_tokens = _resolve_dataset_selection(cli_values=args.datasets)
+        asyncio.run(
+            run_xpia_suite_async(
+                selected_scenario_ids=parse_token_set(args.scenarios),
+                selected_dataset_tokens=selected_dataset_tokens,
+                dry_run=bool(args.dry_run),
+            )
+        )
     except KeyboardInterrupt:
         _LOG.warning("Interrupted by user")
         sys.exit(130)
