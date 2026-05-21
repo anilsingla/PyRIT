@@ -16,7 +16,7 @@ DEFAULT_TEMPERATURE = 0.5
 
 # Defaults sourced from PyRIT .env_example.
 DEFAULT_OPENAI_CHAT_ENDPOINT = "https://ollama.o31e.com"
-DEFAULT_OPENAI_KEY = ""
+DEFAULT_OPENAI_KEY = "dummy"
 
 # Model defaults for each role (can override via env):
 DEFAULT_ATTACKER_MODEL = "llama3.2:1b"
@@ -171,17 +171,17 @@ async def _run_async(*, logger: DualLogger, prompts: list[str], dry_run: bool, m
         logger.error("Missing dependency 'openai'. Install it in your active environment.")
         return 2
 
-    endpoint = os.getenv("OPENAI_CHAT_ENDPOINT", DEFAULT_OPENAI_CHAT_ENDPOINT).strip()
-    model_name = os.getenv("OPENAI_CHAT_MODEL", DEFAULT_OPENAI_CHAT_MODEL).strip()
+    endpoint = (os.getenv("OPENAI_CHAT_ENDPOINT") or DEFAULT_OPENAI_CHAT_ENDPOINT).strip()
+    model_name = (os.getenv("OPENAI_CHAT_MODEL") or DEFAULT_OPENAI_CHAT_MODEL).strip()
     api_key = (
         os.getenv("OPENAI_KEY")
         or os.getenv("OPENAI_CHAT_KEY")
         or os.getenv("OPENAI_API_KEY")
         or DEFAULT_OPENAI_KEY
     ).strip()
-    if not endpoint or not model_name or not api_key:
+    if not endpoint or not model_name:
         logger.error(
-            "Set OPENAI_KEY (or OPENAI_CHAT_KEY / OPENAI_API_KEY) before live execution."
+            "Set OPENAI_CHAT_ENDPOINT and OPENAI_CHAT_MODEL before live execution."
         )
         return 2
 
