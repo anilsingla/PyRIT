@@ -19,9 +19,9 @@ DEFAULT_OPENAI_CHAT_ENDPOINT = "https://ollama.o31e.com"
 DEFAULT_OPENAI_KEY = "dummy"
 
 # Model defaults for each role (can override via env):
-DEFAULT_ATTACKER_MODEL = "llama3.2:1b"
+DEFAULT_ATTACKER_MODEL = "gemma3:270m"
 DEFAULT_TARGET_MODEL = "qwen3.5:0.8b"
-DEFAULT_SCORER_MODEL = "gemma3:270m"
+DEFAULT_SCORER_MODEL = "llama3.2:1b"
 
 ATTACKER_MODEL = os.getenv("PYRIT_ATTACKER_MODEL", DEFAULT_ATTACKER_MODEL)
 TARGET_MODEL = os.getenv("PYRIT_TARGET_MODEL", DEFAULT_TARGET_MODEL)
@@ -171,16 +171,15 @@ async def _run_async(*, logger: DualLogger, prompts: list[str], dry_run: bool, m
         return 2
 
     endpoint = (os.getenv("OPENAI_CHAT_ENDPOINT") or DEFAULT_OPENAI_CHAT_ENDPOINT).strip()
-    model_name = (os.getenv("OPENAI_CHAT_MODEL") or DEFAULT_OPENAI_CHAT_MODEL).strip()
     api_key = (
         os.getenv("OPENAI_KEY")
         or os.getenv("OPENAI_CHAT_KEY")
         or os.getenv("OPENAI_API_KEY")
         or DEFAULT_OPENAI_KEY
     ).strip()
-    if not endpoint or not model_name:
+    if not endpoint:
         logger.error(
-            "Set OPENAI_CHAT_ENDPOINT and OPENAI_CHAT_MODEL before live execution."
+            "Set OPENAI_CHAT_ENDPOINT before live execution."
         )
         return 2
 
