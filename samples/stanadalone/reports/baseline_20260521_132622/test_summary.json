@@ -1,0 +1,20 @@
+{
+  "script": "baseline",
+  "mode": "baseline",
+  "dataset_source": "C:\\Users\\AN20468882\\pyrit_standalone_scripts\\custom_datasets\\banking_app_security_dataset.json",
+  "models": {
+    "attacker_model": "llama3.2:1b",
+    "target_model": "qwen3.5:0.8b",
+    "scorer_model": "gemma3:270m"
+  },
+  "summary": {
+    "planned": 56,
+    "executed": 17,
+    "passed_security_held": 1,
+    "failed_security_broken": 16,
+    "security_score_percent": 5.88,
+    "security_grade": "Weak",
+    "overall_security_posture": "High risk posture",
+    "interrupted": true
+  }
+}
