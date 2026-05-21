@@ -203,14 +203,15 @@ def check_ollama_health(*, endpoint: str, timeout_seconds: int = 5) -> None:
 OLLAMA_ENDPOINT = os.getenv("OLLAMA_ENDPOINT", "http://localhost:11434/v1").strip()
 ALLOW_REMOTE_OLLAMA_ENDPOINT = read_env_bool(name="ALLOW_REMOTE_OLLAMA_ENDPOINT", default=False)
 
-OLLAMA_TARGET_MODEL = os.getenv("OLLAMA_TARGET_MODEL", "llama3.2").strip()
-OLLAMA_ATTACKER_MODEL = os.getenv("OLLAMA_ATTACKER_MODEL", "mistral").strip()
-OLLAMA_SCORER_MODEL = os.getenv("OLLAMA_SCORER_MODEL", "phi3").strip()
+
+OLLAMA_TARGET_MODEL = os.getenv("OLLAMA_TARGET_MODEL", "qwen3.5:0.8b").strip()
+OLLAMA_ATTACKER_MODEL = os.getenv("OLLAMA_ATTACKER_MODEL", "llama3.2:1b").strip()
+OLLAMA_SCORER_MODEL = os.getenv("OLLAMA_SCORER_MODEL", "gemma3:270m").strip()
 OLLAMA_CONVERTER_MODEL = os.getenv("OLLAMA_CONVERTER_MODEL", "phi3").strip()
 
-OLLAMA_TF_SCORER_MODEL = os.getenv("OLLAMA_TF_SCORER_MODEL", "phi3").strip()
-OLLAMA_SCALE_SCORER_MODEL = os.getenv("OLLAMA_SCALE_SCORER_MODEL", "phi3").strip()
-OLLAMA_REFUSAL_SCORER_MODEL = os.getenv("OLLAMA_REFUSAL_SCORER_MODEL", "phi3").strip()
+OLLAMA_TF_SCORER_MODEL = os.getenv("OLLAMA_TF_SCORER_MODEL", "gemma3:270m").strip()
+OLLAMA_SCALE_SCORER_MODEL = os.getenv("OLLAMA_SCALE_SCORER_MODEL", "gemma3:270m").strip()
+OLLAMA_REFUSAL_SCORER_MODEL = os.getenv("OLLAMA_REFUSAL_SCORER_MODEL", "gemma3:270m").strip()
 
 ARTIFACTS_ROOT_PATH = pathlib.Path(os.getenv("ARTIFACTS_ROOT_PATH", "reports")).resolve()
 LOGS_ROOT_PATH = pathlib.Path(os.getenv("LOGS_ROOT_PATH", "logs")).resolve()
