@@ -4,38 +4,64 @@
 from __future__ import annotations
 
 import asyncio
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
 import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent))
 
+# --- Ensure latest PyRIT repo is importable ---
+import sys
+from pathlib import Path
+script_dir = Path(__file__).resolve().parent
+pyrit_repo = Path("c:/githubrepos/Anil_github_repos/PyRIT/pyrit")
+if str(pyrit_repo.parent) not in sys.path:
+    sys.path.insert(0, str(pyrit_repo.parent))
+sys.path.insert(0, str(script_dir))
 
-from pyrit.memory import CentralMemory
-from pyrit.setup import initialize_pyrit_async
-from pyrit.orchestrator import XPIAAttack
-from pyrit.score import get_all_scorers
+import asyncio
 
-def run_xpia_attack(memory, args):
-    attack_runner = XPIAAttack(memory=memory)
-    results = asyncio.run(attack_runner.run())
-    # Show all scorer results
-    for result in results:
-        for scorer in get_all_scorers():
+from standalone_banking_attack_common import DualLogger, Colors, initialize_banking_attack_environment
+
+from pyrit.prompt_target import OpenAIChatTarget
+from standalone_banking_attack_common import get_centralized_scorers
+from pyrit.executor.attack import PromptSendingAttack
+from pyrit.score import Score
+
+DEFAULT_OLLAMA_ENDPOINT = "https://ollama.o31e.com/v1"
+DEFAULT_OLLAMA_MODEL = "llama3.2:1b"
+
+async def run_xpia_attack():
+    logger, tests, dataset_path, memory = await initialize_banking_attack_environment(
+        script_name="pyrit_xpia_attack", script_dir=script_dir, db_name="pyrit_xpia.db"
+    )
+
+    chat_target = OpenAIChatTarget(
+        endpoint=DEFAULT_OLLAMA_ENDPOINT,
+        api_key="dummy",
+        model=DEFAULT_OLLAMA_MODEL,
+        verify_ssl=False,
+    )
+
+    scorers = get_centralized_scorers()
+    attack = PromptSendingAttack(objective_target=chat_target)
+
+    for test in tests:
+        logger.section(f"Test {test.test_number}: {test.objective}")
+        result = await attack.execute_async(objective=test.objective)
+        logger.info(f"LLM Response: {result.response}")
+        for scorer in scorers:
             score = scorer.score(result)
-            print(f"Scorer {scorer.__class__.__name__}: {score}")
-    return 0 if results else 1
+            logger.info(f"Scorer {scorer.__class__.__name__}: {score}")
 
-
-
+    logger.ok("All tests complete.")
+    logger.close()
+    return 0
 def main() -> int:
-    db_path = "pyrit_xpia.db"
-    asyncio.run(initialize_pyrit_async(memory_db_type="sqlite", db_path=db_path))
-    memory = CentralMemory.get_memory_instance()
     try:
-        return run_xpia_attack(memory, None)
+        return asyncio.run(run_xpia_attack())
     except KeyboardInterrupt:
         return 130
-
 
 if __name__ == "__main__":
     raise SystemExit(main())

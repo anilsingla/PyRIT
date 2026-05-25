@@ -1,50 +1,33 @@
-﻿#!/usr/bin/env python3
-"""Standalone Baseline attack runner with unified professional reporting."""
+#!/usr/bin/env python3
+"""Standalone Compliance attack runner with unified professional reporting."""
 
 from __future__ import annotations
 
-
-
-# --- Ensure latest PyRIT repo is importable ---
+import asyncio
 import sys
 from pathlib import Path
+
 script_dir = Path(__file__).resolve().parent
-# Set this to your local clone of the latest PyRIT repo
-pyrit_repo = Path("c:/githubrepos/Anil_github_repos/PyRIT/pyrit")
-if str(pyrit_repo.parent) not in sys.path:
-    sys.path.insert(0, str(pyrit_repo.parent))
 sys.path.insert(0, str(script_dir))
 
-import asyncio
-
-# Local helpers for logging, dataset, etc.
-from standalone_banking_attack_common import DualLogger, Colors, initialize_banking_attack_environment
-
-# PyRIT APIs (latest, from repo)
-
+from standalone_banking_attack_common import DualLogger, Colors, initialize_banking_attack_environment, get_centralized_scorers
 from pyrit.prompt_target import OpenAIChatTarget
-from pyrit.score import get_all_scorers
 from pyrit.executor.attack import PromptSendingAttack
 from pyrit.score import Score
 
-DEFAULT_OLLAMA_ENDPOINT = "https://ollama.o31e.com/v1"
-DEFAULT_OLLAMA_MODEL = "llama3.2:1b"
-
-async def run_baseline_attack():
+async def run_compliance_attack():
     logger, tests, dataset_path, memory = await initialize_banking_attack_environment(
-        script_name="pyrit_baseline_attack", script_dir=script_dir, db_name="pyrit_baseline.db"
+        script_name="pyrit_compliance_attack", script_dir=script_dir, db_name="pyrit_compliance.db"
     )
 
     chat_target = OpenAIChatTarget(
-        endpoint=DEFAULT_OLLAMA_ENDPOINT,
+        endpoint="https://ollama.o31e.com/v1",
         api_key="dummy",
-        model=DEFAULT_OLLAMA_MODEL,
+        model="llama3.2:1b",
         verify_ssl=False,
     )
 
-    # Use all available PyRIT scorers
-    scorers = get_all_scorers()
-
+    scorers = get_centralized_scorers()
     attack = PromptSendingAttack(objective_target=chat_target)
 
     for test in tests:
@@ -59,20 +42,11 @@ async def run_baseline_attack():
     logger.close()
     return 0
 
-
-
-
-
-
-
 def main() -> int:
     try:
-        return asyncio.run(run_baseline_attack())
+        return asyncio.run(run_compliance_attack())
     except KeyboardInterrupt:
         return 130
 
-
 if __name__ == "__main__":
     raise SystemExit(main())
-
-

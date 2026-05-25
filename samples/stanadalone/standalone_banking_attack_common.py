@@ -1,3 +1,25 @@
+# Centralized scorer provider for all attack scripts
+def get_centralized_scorers():
+    from pyrit.score import GandalfScorer, GandalfBinaryScorer, SelfAskGptClassifier, MarkdownInjectionClassifier, TextConversationTokenFinder, SubStringScorer
+    return [
+        GandalfScorer(),
+        GandalfBinaryScorer(),
+        SelfAskGptClassifier(),
+        MarkdownInjectionClassifier(),
+        TextConversationTokenFinder(),
+        SubStringScorer(),
+    ]
+from pyrit.memory import CentralMemory
+from pyrit.setup import initialize_pyrit_async
+
+# Centralized environment setup for banking attack scripts
+async def initialize_banking_attack_environment(script_name: str, script_dir: Path, db_name: str = "pyrit_baseline.db"):
+    await initialize_pyrit_async(memory_db_type="sqlite", db_path=db_name)
+    memory = CentralMemory.get_memory_instance()
+    logger = DualLogger(script_name, script_dir)
+    tests, dataset_path = load_banking_test_cases(script_dir=script_dir, logger=logger)
+    logger.info(f"Loaded {len(tests)} test cases from {dataset_path}")
+    return logger, tests, dataset_path, memory
 import threading
 
 # DualLogger: logs to both console and a file, thread-safe
@@ -98,25 +120,31 @@ def _enable_windows_ansi() -> None:
         pass
 
 
-# PyRIT framework imports
-from pyrit.memory import CentralMemory
-from pyrit.models import Score
-from pyrit.setup import initialize_pyrit_async
-# Optionally import orchestrators as needed
-# from pyrit.orchestrator import RedTeamingAttack, BaselineAttack, etc.
 
-# All custom LLM, scoring, and reporting logic should be replaced by PyRIT orchestrator and Score usage.
+# --- Ensure latest PyRIT repo is importable ---
+import sys
+from pathlib import Path
+pyrit_repo = Path("c:/githubrepos/Anil_github_repos/PyRIT/pyrit")
+if str(pyrit_repo.parent) not in sys.path:
+    sys.path.insert(0, str(pyrit_repo.parent))
 
-# Example stub for running an attack and scoring with PyRIT:
-async def run_pyrit_attack(memory, attack_type, **kwargs):
-    # attack_type: BaselineAttack, RedTeamingAttack, etc.
-    attack_runner = attack_type(memory=memory, **kwargs)
-    results = await attack_runner.run()
-    # Optionally score and store results
-    for result in results:
-        score = Score(...)
-        memory.add_score(score)
-    return results
+# Official PyRIT scorer APIs from latest repo
+from pyrit.score import (
+    score_text,
+    GandalfScorer,
+    GandalfBinaryScorer,
+    SelfAskGptClassifier,
+    PROMPT_INJECTION_CLASSIFIER,
+    QUESTION_ANSWERING_CLASSIFIER,
+    SENTIMENT_CLASSIFIER,
+    MarkdownInjectionClassifier,
+    TextConversationTokenFinder,
+    SubStringScorer,
+)
+from pyrit.prompt_target import PromptChatTarget
+from pyrit.models import ChatMessage
+
+# ...existing code...
 
 
 @dataclass
@@ -1255,68 +1283,63 @@ async def run_standalone_suite(*, script_name: str, mode: str, script_path: Path
                         f"request_id={target_meta.get('request_id', 'unknown')}"
                     )
 
+
                 if response_was_empty:
-                    scorer_results = {
-                        "self_ask_true_false": "<SKIPPED_EMPTY_TARGET_RESPONSE>",
-                        "refusal": "<SKIPPED_EMPTY_TARGET_RESPONSE>",
-                        "self_ask_scale": "<SKIPPED_EMPTY_TARGET_RESPONSE>",
-                        "compliance_inverted_refusal": "<SKIPPED_EMPTY_TARGET_RESPONSE>",
-                    }
-                    scorer_details = {
-                        "self_ask_true_false": {
-                            "source": "skipped",
-                            "raw_output": "<SKIPPED_EMPTY_TARGET_RESPONSE>",
-                            "rationale": "Target response was empty; scorer evaluation skipped.",
-                        },
-                        "refusal": {
-                            "source": "skipped",
-                            "raw_output": "<SKIPPED_EMPTY_TARGET_RESPONSE>",
-                            "rationale": "Target response was empty; scorer evaluation skipped.",
-                        },
-                        "self_ask_scale": {
-                            "source": "skipped",
-                            "raw_output": "<SKIPPED_EMPTY_TARGET_RESPONSE>",
-                            "rationale": "Target response was empty; scorer evaluation skipped.",
-                        },
-                        "compliance_inverted_refusal": {
-                            "source": "skipped",
-                            "raw_output": "<SKIPPED_EMPTY_TARGET_RESPONSE>",
-                            "rationale": "Target response was empty; scorer evaluation skipped.",
-                        },
-                    }
-                    scorer_assessment = {
-                        "objective_status": "NOT_MET",
-                        "objective_met": False,
-                        "refusal_detected": False,
-                        "risk_score": 0,
-                        "compliance": "COMPLIANT",
-                        "rationale": "Target response was empty; scorer evaluation skipped.",
-                        "evidence": "<SKIPPED_EMPTY_TARGET_RESPONSE>",
-                        "confidence": "LOW",
-                    }
+                    logger.warn("Target response was empty; skipping scorer evaluation.")
+                    scorer_outputs = {s: "<SKIPPED_EMPTY_TARGET_RESPONSE>" for s in [
+                        "GandalfScorer", "GandalfBinaryScorer", "SelfAskGptClassifier", "MarkdownInjectionClassifier", "TextConversationTokenFinder", "SubStringScorer"
+                    ]}
                 else:
-                    clear_screen()
-                    logger.info("\n===== SCORER OUTPUTS (CLEAR SCREEN) =====\n")
-                    logger.info(
-                        "Scorer context: "
-                        f"objective_chars={len(case.objective)} "
-                        f"transcript_chars={len(target_conversation_transcript)}"
-                    )
-                    logger.info(f"Scorer objective head: {case.objective[:120].replace(chr(10), ' ')}")
-                    logger.info(
-                        "Scorer transcript head: "
-                        f"{target_conversation_transcript[:180].replace(chr(10), ' ')}"
-                    )
-                    scorer_results, scorer_details, scorer_assessment = await _score_types(
-                        client,
-                        scorer_model=scorer_model,
-                        response_text=final_response,
-                        conversation_transcript=target_conversation_transcript,
-                        test_objective=case.objective,
-                        logger=logger,
-                        case=case,
-                        target_conversation_rows=target_conversation_rows,
-                    )
+                    # Prepare the message for scoring
+                    chat_message = ChatMessage(role="user", content=target_response_text)
+                    scorer_outputs = {}
+                    # GandalfScorer (requires GandalfLevel, skipping if not configured)
+                    try:
+                        scorer = GandalfScorer(level=None)  # Provide GandalfLevel if needed
+                        score = scorer.score_text(target_response_text)
+                        scorer_outputs["GandalfScorer"] = str(score)
+                    except Exception as e:
+                        scorer_outputs["GandalfScorer"] = f"ERROR: {e}"
+                    # GandalfBinaryScorer
+                    try:
+                        scorer = GandalfBinaryScorer()
+                        score = scorer.score_text(target_response_text)
+                        scorer_outputs["GandalfBinaryScorer"] = str(score)
+                    except Exception as e:
+                        scorer_outputs["GandalfBinaryScorer"] = f"ERROR: {e}"
+                    # SelfAskGptClassifier (using PROMPT_INJECTION_CLASSIFIER as example)
+                    try:
+                        chat_target = PromptChatTarget()
+                        scorer = SelfAskGptClassifier(PROMPT_INJECTION_CLASSIFIER, chat_target)
+                        score = scorer.score_text(target_response_text)
+                        scorer_outputs["SelfAskGptClassifier"] = str(score)
+                    except Exception as e:
+                        scorer_outputs["SelfAskGptClassifier"] = f"ERROR: {e}"
+                    # MarkdownInjectionClassifier
+                    try:
+                        scorer = MarkdownInjectionClassifier()
+                        score = scorer.score_text(target_response_text)
+                        scorer_outputs["MarkdownInjectionClassifier"] = str(score)
+                    except Exception as e:
+                        scorer_outputs["MarkdownInjectionClassifier"] = f"ERROR: {e}"
+                    # TextConversationTokenFinder
+                    try:
+                        scorer = TextConversationTokenFinder()
+                        score = scorer.score_text(target_response_text)
+                        scorer_outputs["TextConversationTokenFinder"] = str(score)
+                    except Exception as e:
+                        scorer_outputs["TextConversationTokenFinder"] = f"ERROR: {e}"
+                    # SubStringScorer
+                    try:
+                        scorer = SubStringScorer(substring="test")
+                        score = scorer.score_text(target_response_text)
+                        scorer_outputs["SubStringScorer"] = str(score)
+                    except Exception as e:
+                        scorer_outputs["SubStringScorer"] = f"ERROR: {e}"
+
+                logger.info("Scorer outputs:")
+                for scorer_name, output in scorer_outputs.items():
+                    logger.info(f"  {scorer_name}: {output}")
 
                 logger.info(
                     "Scorer standardized assessment: "
