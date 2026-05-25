@@ -9,22 +9,31 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from standalone_banking_attack_common import build_common_parser, run_standalone_suite
+
+from pyrit.memory import CentralMemory
+from pyrit.setup import initialize_pyrit_async
+from pyrit.orchestrator import BaselineAttack
+
+def run_baseline_attack(memory, args):
+    # Example: You may need to adapt arguments to BaselineAttack as per your PyRIT version
+    attack_runner = BaselineAttack(memory=memory)
+    # You may want to pass dataset, model, or other config here
+    results = asyncio.run(attack_runner.run())
+    return 0 if results else 1
 
 
 def main() -> int:
-    parser = build_common_parser("Standalone baseline attack runner.")
-    args = parser.parse_args()
+    # Initialize PyRIT database (adjust db_path as needed)
+    db_path = "pyrit_baseline.db"
+    asyncio.run(initialize_pyrit_async(memory_db_type="sqlite", db_path=db_path))
+    memory = CentralMemory.get_memory_instance()
+
+    # Parse arguments if needed (optional, or adapt to BaselineAttack requirements)
+    # parser = build_common_parser("Standalone baseline attack runner.")
+    # args = parser.parse_args()
+
     try:
-        return asyncio.run(
-            run_standalone_suite(
-                script_name="baseline",
-                mode="baseline",
-                script_path=Path(__file__).resolve(),
-                max_tests=args.max_tests,
-                temperature=args.temperature,
-            )
-        )
+        return run_baseline_attack(memory, None)
     except KeyboardInterrupt:
         return 130
 

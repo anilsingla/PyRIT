@@ -1,3 +1,5 @@
+def clear_screen():
+    os.system('cls' if os.name == 'nt' else 'clear')
 #!/usr/bin/env python3
 """Shared standalone banking attack runner with consistent test reporting."""
 
@@ -56,44 +58,25 @@ def _enable_windows_ansi() -> None:
         pass
 
 
-class DualLogger:
-    def __init__(self, *, script_name: str, base_dir: Path) -> None:
-        report_dir = base_dir / "pyrit_reports"
-        report_dir.mkdir(parents=True, exist_ok=True)
-        self.log_path = report_dir / f"{script_name}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.log"
-        self._fh = self.log_path.open("w", encoding="utf-8", buffering=1)
+# PyRIT framework imports
+from pyrit.memory import CentralMemory
+from pyrit.models import Score
+from pyrit.setup import initialize_pyrit_async
+# Optionally import orchestrators as needed
+# from pyrit.orchestrator import RedTeamingAttack, BaselineAttack, etc.
 
-    def info(self, msg: str) -> None:
-        self._write("INFO", Colors.CYAN, msg)
+# All custom LLM, scoring, and reporting logic should be replaced by PyRIT orchestrator and Score usage.
 
-    def ok(self, msg: str) -> None:
-        self._write("OK", Colors.GREEN, msg)
-
-    def warn(self, msg: str) -> None:
-        self._write("WARN", Colors.YELLOW, msg)
-
-    def error(self, msg: str) -> None:
-        self._write("ERROR", Colors.RED, msg)
-
-    def section(self, title: str) -> None:
-        border = "=" * 92
-        self.info(border)
-        self.info(f"{title}")
-        self.info(border)
-
-    def separator(self) -> None:
-        self.info("-" * 92)
-
-    def _write(self, level: str, color: str, message: str) -> None:
-        ts = datetime.now().strftime("%H:%M:%S")
-        plain = f"[{ts}] [{level}] {message}"
-        decorated = f"{Colors.DIM}[{ts}]{Colors.RESET} {color}[{level}]{Colors.RESET} {message}"
-        print(decorated)
-        self._fh.write(plain + "\n")
-
-    def close(self) -> None:
-        self._fh.flush()
-        self._fh.close()
+# Example stub for running an attack and scoring with PyRIT:
+async def run_pyrit_attack(memory, attack_type, **kwargs):
+    # attack_type: BaselineAttack, RedTeamingAttack, etc.
+    attack_runner = attack_type(memory=memory, **kwargs)
+    results = await attack_runner.run()
+    # Optionally score and store results
+    for result in results:
+        score = Score(...)
+        memory.add_score(score)
+    return results
 
 
 @dataclass
@@ -663,7 +646,8 @@ async def _score_types(
         "compliance_inverted_refusal": COLOR_GREEN,
     }
 
-    logger.info(f"\n{COLOR_BOLD}Scorer Assessment:{COLOR_RESET}")
+    clear_screen()
+    logger.info(f"\n{COLOR_BOLD}===== SCORER ASSESSMENT (CLEAR SCREEN) ====={COLOR_RESET}")
     logger.info(f"  {COLOR_DIM}Objective: {case.objective[:90].replace(chr(10), ' ')}{COLOR_RESET}")
     logger.info(f"  {COLOR_DIM}Transcript chars: {len(conversation_transcript)}{COLOR_RESET}")
     logger.info(f"  {COLOR_DIM}Model: {scorer_model}{COLOR_RESET}")
@@ -1271,6 +1255,8 @@ async def run_standalone_suite(*, script_name: str, mode: str, script_path: Path
                         "confidence": "LOW",
                     }
                 else:
+                    clear_screen()
+                    logger.info("\n===== SCORER OUTPUTS (CLEAR SCREEN) =====\n")
                     logger.info(
                         "Scorer context: "
                         f"objective_chars={len(case.objective)} "

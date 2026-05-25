@@ -9,22 +9,30 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from standalone_banking_attack_common import build_common_parser, run_standalone_suite
+
+from pyrit.memory import CentralMemory
+from pyrit.setup import initialize_pyrit_async
+from pyrit.orchestrator import RedTeamingAttack
+from pyrit.score import get_all_scorers
+
+def run_redteam_attack(memory, args):
+    attack_runner = RedTeamingAttack(memory=memory)
+    results = asyncio.run(attack_runner.run())
+    # Show all scorer results
+    for result in results:
+        for scorer in get_all_scorers():
+            score = scorer.score(result)
+            print(f"Scorer {scorer.__class__.__name__}: {score}")
+    return 0 if results else 1
+
 
 
 def main() -> int:
-    parser = build_common_parser("Standalone redteam attack runner.")
-    args = parser.parse_args()
+    db_path = "pyrit_redteam.db"
+    asyncio.run(initialize_pyrit_async(memory_db_type="sqlite", db_path=db_path))
+    memory = CentralMemory.get_memory_instance()
     try:
-        return asyncio.run(
-            run_standalone_suite(
-                script_name="redteam",
-                mode="redteam",
-                script_path=Path(__file__).resolve(),
-                max_tests=args.max_tests,
-                temperature=args.temperature,
-            )
-        )
+        return run_redteam_attack(memory, None)
     except KeyboardInterrupt:
         return 130
 
