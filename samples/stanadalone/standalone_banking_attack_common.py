@@ -1,10 +1,11 @@
+from __future__ import annotations
 import html
 import time
 # --- Required imports for async and thread-safe operations ---
 import asyncio
 import threading
 
-from pyrit.prompt_target.common.target_capabilities import dataclass
+from dataclasses import dataclass
 # --- Default configuration constants (required by downstream functions) ---
 DEFAULT_OPENAI_CHAT_ENDPOINT = "https://ollama.o31e.com/v1"
 DEFAULT_OPENAI_KEY = "dummy"
@@ -142,7 +143,6 @@ def clear_screen():
 #!/usr/bin/env python3
 """Shared standalone banking attack runner with consistent test reporting."""
 
-from __future__ import annotations
 
 
 import os
