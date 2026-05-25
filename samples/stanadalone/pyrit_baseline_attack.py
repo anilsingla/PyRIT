@@ -17,18 +17,17 @@ sys.path.insert(0, str(script_dir))
 
 import asyncio
 
-# Local helpers for logging, dataset, etc.
-from standalone_banking_attack_common import DualLogger, Colors, initialize_banking_attack_environment
 
-# PyRIT APIs (latest, from repo)
-
+# Only import what is used
+from standalone_banking_attack_common import initialize_banking_attack_environment, get_centralized_scorers
 from pyrit.prompt_target import OpenAIChatTarget
-from pyrit.score import get_all_scorers
 from pyrit.executor.attack import PromptSendingAttack
-from pyrit.score import Score
 
 DEFAULT_OLLAMA_ENDPOINT = "https://ollama.o31e.com/v1"
 DEFAULT_OLLAMA_MODEL = "llama3.2:1b"
+
+
+from standalone_banking_attack_common import CentralizedScorerRunner
 
 async def run_baseline_attack():
     logger, tests, dataset_path, memory = await initialize_banking_attack_environment(
@@ -42,28 +41,11 @@ async def run_baseline_attack():
         verify_ssl=False,
     )
 
-    # Use all available PyRIT scorers
-    scorers = get_all_scorers()
-
+    scorers = get_centralized_scorers()
     attack = PromptSendingAttack(objective_target=chat_target)
-
-    for test in tests:
-        logger.section(f"Test {test.test_number}: {test.objective}")
-        result = await attack.execute_async(objective=test.objective)
-        logger.info(f"LLM Response: {result.response}")
-        for scorer in scorers:
-            score = scorer.score(result)
-            logger.info(f"Scorer {scorer.__class__.__name__}: {score}")
-
-    logger.ok("All tests complete.")
-    logger.close()
+    runner = CentralizedScorerRunner(logger, scorers)
+    await runner.run(tests, attack)
     return 0
-
-
-
-
-
-
 
 def main() -> int:
     try:

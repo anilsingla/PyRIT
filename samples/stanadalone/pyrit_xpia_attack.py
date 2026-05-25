@@ -21,12 +21,10 @@ sys.path.insert(0, str(script_dir))
 
 import asyncio
 
-from standalone_banking_attack_common import DualLogger, Colors, initialize_banking_attack_environment
 
+from standalone_banking_attack_common import initialize_banking_attack_environment, get_centralized_scorers, CentralizedScorerRunner
 from pyrit.prompt_target import OpenAIChatTarget
-from standalone_banking_attack_common import get_centralized_scorers
 from pyrit.executor.attack import PromptSendingAttack
-from pyrit.score import Score
 
 DEFAULT_OLLAMA_ENDPOINT = "https://ollama.o31e.com/v1"
 DEFAULT_OLLAMA_MODEL = "llama3.2:1b"
@@ -42,20 +40,10 @@ async def run_xpia_attack():
         model=DEFAULT_OLLAMA_MODEL,
         verify_ssl=False,
     )
-
     scorers = get_centralized_scorers()
     attack = PromptSendingAttack(objective_target=chat_target)
-
-    for test in tests:
-        logger.section(f"Test {test.test_number}: {test.objective}")
-        result = await attack.execute_async(objective=test.objective)
-        logger.info(f"LLM Response: {result.response}")
-        for scorer in scorers:
-            score = scorer.score(result)
-            logger.info(f"Scorer {scorer.__class__.__name__}: {score}")
-
-    logger.ok("All tests complete.")
-    logger.close()
+    runner = CentralizedScorerRunner(logger, scorers)
+    await runner.run(tests, attack)
     return 0
 def main() -> int:
     try:
