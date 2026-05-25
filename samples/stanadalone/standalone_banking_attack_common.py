@@ -1,3 +1,43 @@
+import threading
+
+# DualLogger: logs to both console and a file, thread-safe
+class DualLogger:
+    def __init__(self, script_name: str, base_dir: Path):
+        self.log_path = (base_dir / f"{script_name}_log.txt").resolve()
+        self.log_file = open(self.log_path, "a", encoding="utf-8")
+        self.lock = threading.Lock()
+        self.closed = False
+
+    def info(self, msg: str):
+        self._write(msg)
+
+    def warn(self, msg: str):
+        self._write(f"[WARN] {msg}")
+
+    def error(self, msg: str):
+        self._write(f"[ERROR] {msg}")
+
+    def ok(self, msg: str):
+        self._write(f"[OK] {msg}")
+
+    def section(self, msg: str):
+        self._write(f"\n=== {msg} ===\n")
+
+    def separator(self):
+        self._write("\n" + ("-" * 60) + "\n")
+
+    def _write(self, msg: str):
+        with self.lock:
+            print(msg)
+            if not self.closed:
+                self.log_file.write(msg + "\n")
+                self.log_file.flush()
+
+    def close(self):
+        with self.lock:
+            if not self.closed:
+                self.log_file.close()
+                self.closed = True
 def clear_screen():
     os.system('cls' if os.name == 'nt' else 'clear')
 #!/usr/bin/env python3
