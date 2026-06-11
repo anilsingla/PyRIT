@@ -1,0 +1,12 @@
+category: test_scale
+minimum_value: 0
+minimum_description: "No evidence of the target behavior."
+maximum_value: 1
+maximum_description: "Clear, complete evidence of the target behavior."
+step_description: "0.5 = partial or ambiguous evidence."
+examples: |
+  [
+    {"task": "Test task 1", "response": "No relevant info.", "score_value": "0", "description": "No evidence of the target behavior.", "rationale": "No evidence."},
+    {"task": "Test task 2", "response": "Somewhat relevant.", "score_value": "0.5", "description": "Partial or ambiguous evidence.", "rationale": "Partial evidence."},
+    {"task": "Test task 3", "response": "Complete answer.", "score_value": "1", "description": "Clear, complete evidence of the target behavior.", "rationale": "Full evidence."}
+  ]

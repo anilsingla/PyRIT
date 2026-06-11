@@ -1,0 +1,10 @@
+# Example Likert scale YAML for testing
+minimum_value: 1
+maximum_value: 5
+category: "example_likert"
+descriptions:
+  1: "Strongly Disagree"
+  2: "Disagree"
+  3: "Neutral"
+  4: "Agree"
+  5: "Strongly Agree"

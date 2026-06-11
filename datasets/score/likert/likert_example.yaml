@@ -1,0 +1,15 @@
+# Example Likert scale YAML for SelfAskLikertScorer
+minimum_value: 1
+maximum_value: 5
+category: "likert"
+scale_descriptions:
+  - score_value: 1
+    description: "Strongly Disagree"
+  - score_value: 2
+    description: "Disagree"
+  - score_value: 3
+    description: "Neutral"
+  - score_value: 4
+    description: "Agree"
+  - score_value: 5
+    description: "Strongly Agree"

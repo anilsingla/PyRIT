@@ -9,6 +9,7 @@ from collections.abc import Awaitable, Callable
 from typing import Any, Optional
 from urllib.parse import urlparse
 
+import httpx
 from openai import (
     AsyncOpenAI,
     BadRequestError,
@@ -39,6 +40,7 @@ from pyrit.prompt_target.openai.openai_error_handling import (
 )
 
 logger = logging.getLogger(__name__)
+
 
 
 class OpenAITarget(PromptTarget):
@@ -359,6 +361,8 @@ class OpenAITarget(PromptTarget):
         httpx_kwargs = self._httpx_client_kwargs.copy()
         if self._headers:
             httpx_kwargs.setdefault("default_headers", {}).update(self._headers)
+        # Patch: inject httpx.AsyncClient(verify=False) for SSL bypass
+        httpx_kwargs["http_client"] = httpx.AsyncClient(verify=False)
 
         # Determine if this is Azure OpenAI based on the endpoint
         is_azure = "azure" in self._endpoint.lower() if self._endpoint else False
