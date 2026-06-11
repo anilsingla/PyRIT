@@ -5,9 +5,16 @@ import csv
 import json
 import sys
 from pathlib import Path
-from typing import IO, Optional
+from typing import IO, Any, cast
 
-from pyrit.models import Message, MessagePiece
+from pyrit.common.deprecation import print_deprecation_message
+from pyrit.models import (
+    ChatMessageRole,
+    Message,
+    MessagePiece,
+    PromptDataType,
+    PromptResponseError,
+)
 from pyrit.prompt_target.common.prompt_target import PromptTarget
 from pyrit.prompt_target.common.target_configuration import TargetConfiguration
 
@@ -25,7 +32,7 @@ class TextTarget(PromptTarget):
         self,
         *,
         text_stream: IO[str] = sys.stdout,
-        custom_configuration: Optional[TargetConfiguration] = None,
+        custom_configuration: TargetConfiguration | None = None,
     ) -> None:
         """
         Initialize the TextTarget.
@@ -67,27 +74,37 @@ class TextTarget(PromptTarget):
         Returns:
             list[MessagePiece]: A list of message pieces imported from the CSV.
         """
+        print_deprecation_message(
+            old_item="pyrit.prompt_target.TextTarget.import_scores_from_csv",
+            new_item="pyrit.memory.MemoryInterface.add_message_pieces_to_memory",
+            removed_in="0.16.0",
+        )
+
         message_pieces = []
 
         with open(csv_file_path, newline="") as csvfile:
             csvreader = csv.DictReader(csvfile)
 
             for row in csvreader:
-                sequence_str = row.get("sequence", None)
-                labels_str = row.get("labels", None)
-                labels = json.loads(labels_str) if labels_str else None
+                sequence_str = row.get("sequence")
+                labels_str = row.get("labels")
 
-                message_piece = MessagePiece(
-                    role=row["role"],  # type: ignore[ty:invalid-argument-type]
-                    original_value=row["value"],
-                    original_value_data_type=row.get("data_type", None),  # type: ignore[ty:invalid-argument-type]
-                    conversation_id=row.get("conversation_id", None),
-                    sequence=int(sequence_str) if sequence_str else 0,
-                    labels=labels,  # deprecated
-                    response_error=row.get("response_error", None),  # type: ignore[ty:invalid-argument-type]
-                    prompt_target_identifier=self.get_identifier(),
-                )
-                message_pieces.append(message_piece)
+                piece_kwargs: dict[str, Any] = {
+                    "role": cast("ChatMessageRole", row["role"]),
+                    "original_value": row["value"],
+                    "sequence": int(sequence_str) if sequence_str else 0,
+                    "prompt_target_identifier": self.get_identifier(),
+                }
+                if row.get("data_type"):
+                    piece_kwargs["original_value_data_type"] = cast("PromptDataType", row["data_type"])
+                if row.get("conversation_id"):
+                    piece_kwargs["conversation_id"] = row["conversation_id"]
+                if labels_str:
+                    piece_kwargs["labels"] = json.loads(labels_str)  # deprecated
+                if row.get("response_error"):
+                    piece_kwargs["response_error"] = cast("PromptResponseError", row["response_error"])
+
+                message_pieces.append(MessagePiece(**piece_kwargs))
 
         # This is post validation, so the message_pieces should be okay and normalized
         self._memory.add_message_pieces_to_memory(message_pieces=message_pieces)
@@ -96,5 +113,14 @@ class TextTarget(PromptTarget):
     def _validate_request(self, *, normalized_conversation: list[Message]) -> None:
         pass
 
-    async def cleanup_target(self) -> None:
+    async def cleanup_target_async(self) -> None:
         """Target does not require cleanup."""
+
+    async def cleanup_target(self) -> None:  # pyrit-async-suffix-exempt
+        """Use ``cleanup_target_async`` instead; this is a deprecated alias."""
+        print_deprecation_message(
+            old_item="pyrit.prompt_target.TextTarget.cleanup_target",
+            new_item="pyrit.prompt_target.TextTarget.cleanup_target_async",
+            removed_in="0.16.0",
+        )
+        await self.cleanup_target_async()

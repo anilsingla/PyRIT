@@ -11,9 +11,8 @@ from openai.types.chat import ChatCompletion
 from unit.mocks import get_sample_conversations, openai_chat_response_json_dict
 
 from pyrit.executor.attack.core.attack_strategy import AttackStrategy
-from pyrit.identifiers import ComponentIdentifier
 from pyrit.memory.memory_interface import MemoryInterface
-from pyrit.models import Message, MessagePiece
+from pyrit.models import ComponentIdentifier, Message, MessagePiece
 from pyrit.prompt_target import OpenAIChatTarget
 from pyrit.prompt_target.common.target_capabilities import (
     CapabilityHandlingPolicy,
@@ -460,6 +459,77 @@ async def test_conversation_id_stamped_on_all_but_full_lineage_only_on_last():
 
         # Warning should fire because message count increased (2 → 3).
         mock_warn.assert_called_once()
+
+
+@pytest.mark.usefixtures("patch_central_database")
+async def test_json_schema_stripped_for_non_schema_target_survives_lineage():
+    """
+    Regression: for a non-schema target (default ADAPT) the embedded json_schema is
+    removed by JsonSchemaNormalizer and must NOT be re-introduced by
+    _propagate_lineage copying the original (unstripped) request metadata back onto
+    the normalized message.
+    """
+    target = OpenAIChatTarget(
+        model_name="gpt-4o",
+        endpoint="https://mock.azure.com/",
+        api_key="mock-api-key",
+    )
+    assert target.configuration.capabilities.supports_json_schema is False
+
+    piece = MessagePiece(
+        role="user",
+        conversation_id=_LINEAGE_CONVERSATION_ID,
+        original_value="score this",
+        converted_value="score this",
+        original_value_data_type="text",
+        converted_value_data_type="text",
+        prompt_metadata={"response_format": "json", "json_schema": {"type": "object"}},
+    )
+    user_msg = Message(message_pieces=[piece])
+
+    mock_memory = MagicMock(spec=MemoryInterface)
+    mock_memory.get_conversation.return_value = []
+    target._memory = mock_memory
+
+    normalized = await target._get_normalized_conversation_async(message=user_msg)
+
+    last_piece = normalized[-1].message_pieces[0]
+    assert "json_schema" not in last_piece.prompt_metadata
+    assert last_piece.prompt_metadata.get("response_format") == "json"
+
+
+@pytest.mark.usefixtures("patch_central_database")
+async def test_json_schema_only_metadata_fully_stripped_survives_lineage():
+    """
+    Regression: even when json_schema is the ONLY metadata key, the strip leaves empty
+    metadata and _propagate_lineage must not restore the original json_schema (the piece
+    is the same logical piece, identified by id, so its stripped metadata is authoritative).
+    """
+    target = OpenAIChatTarget(
+        model_name="gpt-4o",
+        endpoint="https://mock.azure.com/",
+        api_key="mock-api-key",
+    )
+
+    piece = MessagePiece(
+        role="user",
+        conversation_id=_LINEAGE_CONVERSATION_ID,
+        original_value="score this",
+        converted_value="score this",
+        original_value_data_type="text",
+        converted_value_data_type="text",
+        prompt_metadata={"json_schema": {"type": "object"}},
+    )
+    user_msg = Message(message_pieces=[piece])
+
+    mock_memory = MagicMock(spec=MemoryInterface)
+    mock_memory.get_conversation.return_value = []
+    target._memory = mock_memory
+
+    normalized = await target._get_normalized_conversation_async(message=user_msg)
+
+    last_piece = normalized[-1].message_pieces[0]
+    assert "json_schema" not in last_piece.prompt_metadata
 
 
 @pytest.mark.usefixtures("patch_central_database")

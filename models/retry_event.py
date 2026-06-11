@@ -3,12 +3,16 @@
 
 """Data model for capturing individual retry events during execution."""
 
-from dataclasses import dataclass, field
+from __future__ import annotations
+
 from datetime import datetime, timezone
 
+from pydantic import BaseModel, Field
 
-@dataclass
-class RetryEvent:
+from pyrit.common.deprecation import print_deprecation_message
+
+
+class RetryEvent(BaseModel):
     """
     A single retry attempt captured during attack execution.
 
@@ -18,7 +22,7 @@ class RetryEvent:
     attached to AttackResult objects for persistence and REST API exposure.
     """
 
-    timestamp: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     attempt_number: int = 0
     function_name: str = ""
     exception_type: str = ""
@@ -32,25 +36,28 @@ class RetryEvent:
         """
         Serialize to a dictionary suitable for JSON storage.
 
+        .. deprecated::
+            Use ``model_dump`` with ``mode="json"`` instead. This method
+            will be removed in version 0.16.0.
+
         Returns:
             dict: Dictionary representation of the retry event.
         """
-        return {
-            "timestamp": self.timestamp.isoformat(),
-            "attempt_number": self.attempt_number,
-            "function_name": self.function_name,
-            "exception_type": self.exception_type,
-            "exception_message": self.exception_message,
-            "component_role": self.component_role,
-            "component_name": self.component_name,
-            "endpoint": self.endpoint,
-            "elapsed_seconds": self.elapsed_seconds,
-        }
+        print_deprecation_message(
+            old_item=RetryEvent.to_dict,
+            new_item='RetryEvent.model_dump(mode="json")',
+            removed_in="0.16.0",
+        )
+        return self.model_dump(mode="json")
 
     @classmethod
-    def from_dict(cls, data: dict) -> "RetryEvent":
+    def from_dict(cls, data: dict) -> RetryEvent:
         """
         Deserialize from a dictionary.
+
+        .. deprecated::
+            Use ``model_validate`` instead. This method will be removed
+            in version 0.16.0.
 
         Args:
             data: Dictionary representation of a retry event.
@@ -58,14 +65,9 @@ class RetryEvent:
         Returns:
             RetryEvent: Deserialized retry event.
         """
-        return cls(
-            timestamp=datetime.fromisoformat(data["timestamp"]),
-            attempt_number=data.get("attempt_number", 0),
-            function_name=data.get("function_name", ""),
-            exception_type=data.get("exception_type", ""),
-            exception_message=data.get("exception_message", ""),
-            component_role=data.get("component_role", ""),
-            component_name=data.get("component_name"),
-            endpoint=data.get("endpoint"),
-            elapsed_seconds=data.get("elapsed_seconds", 0.0),
+        print_deprecation_message(
+            old_item=RetryEvent.from_dict,
+            new_item="RetryEvent.model_validate",
+            removed_in="0.16.0",
         )
+        return cls.model_validate(data)

@@ -18,7 +18,6 @@ Helper functions include:
 """
 
 import uuid
-from typing import Optional
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -34,8 +33,7 @@ from pyrit.executor.attack.component.conversation_manager import (
 )
 from pyrit.executor.attack.core import AttackContext
 from pyrit.executor.attack.core.attack_parameters import AttackParameters
-from pyrit.identifiers import ComponentIdentifier
-from pyrit.models import Message, MessagePiece, Score
+from pyrit.models import ComponentIdentifier, Message, MessagePiece, Score
 from pyrit.prompt_normalizer import PromptConverterConfiguration, PromptNormalizer
 from pyrit.prompt_target import PromptTarget
 
@@ -57,7 +55,7 @@ class _TestAttackContext(AttackContext):
     """Concrete AttackContext for testing."""
 
     # Add last_score to match MultiTurnAttackContext behavior for testing
-    last_score: Optional[Score] = None
+    last_score: Score | None = None
 
 
 # =============================================================================
@@ -78,7 +76,7 @@ def attack_identifier() -> ComponentIdentifier:
 def mock_prompt_normalizer() -> MagicMock:
     """Create a mock prompt normalizer for testing."""
     normalizer = MagicMock(spec=PromptNormalizer)
-    normalizer.convert_values = AsyncMock()
+    normalizer.convert_values_async = AsyncMock()
     return normalizer
 
 
@@ -189,7 +187,7 @@ class TestMarkMessagesAsSimulated:
         result = mark_messages_as_simulated([message])
 
         assert len(result) == 1
-        assert result[0].message_pieces[0].get_role_for_storage() == "simulated_assistant"
+        assert result[0].message_pieces[0].role == "simulated_assistant"
         assert result[0].message_pieces[0].api_role == "assistant"
         assert result[0].message_pieces[0].is_simulated is True
 
@@ -201,7 +199,7 @@ class TestMarkMessagesAsSimulated:
         result = mark_messages_as_simulated([message])
 
         assert len(result) == 1
-        assert result[0].message_pieces[0].get_role_for_storage() == "user"
+        assert result[0].message_pieces[0].role == "user"
         assert result[0].message_pieces[0].is_simulated is False
 
     def test_leaves_system_unchanged(self) -> None:
@@ -212,7 +210,7 @@ class TestMarkMessagesAsSimulated:
         result = mark_messages_as_simulated([message])
 
         assert len(result) == 1
-        assert result[0].message_pieces[0].get_role_for_storage() == "system"
+        assert result[0].message_pieces[0].role == "system"
         assert result[0].message_pieces[0].is_simulated is False
 
     def test_mixed_conversation(self) -> None:
@@ -229,10 +227,10 @@ class TestMarkMessagesAsSimulated:
 
         assert len(result) == 2
         # User should be unchanged
-        assert result[0].message_pieces[0].get_role_for_storage() == "user"
+        assert result[0].message_pieces[0].role == "user"
         assert result[0].is_simulated is False
         # Assistant should be converted
-        assert result[1].message_pieces[0].get_role_for_storage() == "simulated_assistant"
+        assert result[1].message_pieces[0].role == "simulated_assistant"
         assert result[1].is_simulated is True
         assert result[1].api_role == "assistant"
 
@@ -797,7 +795,7 @@ class TestInitializeContext:
         stored = manager.get_conversation(conversation_id)
         assert len(stored) == 1
         # Should be stored as simulated_assistant but api_role is still assistant
-        assert stored[0].get_piece().get_role_for_storage() == "simulated_assistant"
+        assert stored[0].get_piece().role == "simulated_assistant"
         assert stored[0].get_piece().api_role == "assistant"
 
     async def test_normalizes_for_non_chat_target_by_default(
@@ -890,8 +888,25 @@ class TestInitializeContext:
         # All pieces in a Message must share the same conversation_id
         piece_conversation_id = str(uuid.uuid4())
 
-        # Create score for first piece
-        # Prepended conversations are simulated, so only false scores are extracted
+        piece1 = MessagePiece(
+            role="assistant",
+            original_value="Here is the analysis:",
+            original_value_data_type="text",
+            conversation_id=piece_conversation_id,
+        )
+        piece2 = MessagePiece(
+            role="assistant",
+            original_value="chart_image.png",
+            original_value_data_type="image_path",
+            conversation_id=piece_conversation_id,
+        )
+
+        # Pre-stage the original pieces + scores in memory so add_scores_to_memory
+        # passes its existence check. initialize_context_async will then duplicate
+        # the pieces under the target conversation_id, keeping ``original_prompt_id``
+        # set to the input id (which is what ScoreEntry.prompt_request_response_id
+        # points at), so the per-conversation score lookup resolves them.
+        manager._memory.add_message_pieces_to_memory(message_pieces=[piece1, piece2])
         score1 = Score(
             score_type="true_false",
             score_value="false",
@@ -899,19 +914,9 @@ class TestInitializeContext:
             score_value_description="Score for text piece",
             score_rationale="Test rationale for text",
             score_metadata={},
-            message_piece_id=str(uuid.uuid4()),
+            message_piece_id=str(piece1.id),
             scorer_class_identifier=get_mock_scorer_identifier(),
         )
-        piece1 = MessagePiece(
-            role="assistant",
-            original_value="Here is the analysis:",
-            original_value_data_type="text",
-            conversation_id=piece_conversation_id,
-            scores=[score1],  # Attach score directly to piece
-        )
-
-        # Create score for second piece
-        # Also false since prepended conversations only extract false scores
         score2 = Score(
             score_type="true_false",
             score_value="false",
@@ -919,16 +924,10 @@ class TestInitializeContext:
             score_value_description="Score for image piece",
             score_rationale="Test rationale for image",
             score_metadata={},
-            message_piece_id=str(uuid.uuid4()),
+            message_piece_id=str(piece2.id),
             scorer_class_identifier=get_mock_scorer_identifier(),
         )
-        piece2 = MessagePiece(
-            role="assistant",
-            original_value="chart_image.png",
-            original_value_data_type="image_path",
-            conversation_id=piece_conversation_id,
-            scores=[score2],  # Attach score directly to piece
-        )
+        manager._memory.add_scores_to_memory(scores=[score1, score2])
 
         multipart_response = Message(message_pieces=[piece1, piece2])
         context.prepended_conversation = [
@@ -945,8 +944,9 @@ class TestInitializeContext:
 
         # Verify scores from both pieces are returned
         assert len(state.last_assistant_message_scores) == 2
-        assert score1 in state.last_assistant_message_scores
-        assert score2 in state.last_assistant_message_scores
+        returned_ids = {s.id for s in state.last_assistant_message_scores}
+        assert score1.id in returned_ids
+        assert score2.id in returned_ids
 
     async def test_prepended_conversation_ignores_true_scores(
         self,
@@ -960,8 +960,27 @@ class TestInitializeContext:
         are extracted to provide feedback rationale for continued attack attempts.
         """
         manager = ConversationManager(attack_identifier=attack_identifier)
-        conversation_id = str(uuid.uuid4())
         context = _TestAttackContext(params=AttackParameters(objective="Test objective"))
+
+        piece_with_true = MessagePiece(
+            role="assistant",
+            original_value="Simulated success response",
+            original_value_data_type="text",
+            conversation_id=str(uuid.uuid4()),
+        )
+
+        piece_with_false = MessagePiece(
+            role="assistant",
+            original_value="Simulated refusal response",
+            original_value_data_type="text",
+            conversation_id=str(uuid.uuid4()),
+        )
+
+        # Pre-stage the pieces in memory so add_scores_to_memory passes its
+        # existence check. initialize_context_async will duplicate them under
+        # the target conversation_id, preserving ``original_prompt_id`` so the
+        # score lookup resolves the staged scores.
+        manager._memory.add_message_pieces_to_memory(message_pieces=[piece_with_true, piece_with_false])
 
         # Create a score with true value - should be ignored
         true_score = Score(
@@ -971,7 +990,7 @@ class TestInitializeContext:
             score_value_description="Should be ignored",
             score_rationale="This simulated success should not be extracted",
             score_metadata={},
-            message_piece_id=str(uuid.uuid4()),
+            message_piece_id=str(piece_with_true.id),
             scorer_class_identifier=get_mock_scorer_identifier(),
         )
 
@@ -983,25 +1002,11 @@ class TestInitializeContext:
             score_value_description="Should be extracted",
             score_rationale="This refusal can provide feedback",
             score_metadata={},
-            message_piece_id=str(uuid.uuid4()),
+            message_piece_id=str(piece_with_false.id),
             scorer_class_identifier=get_mock_scorer_identifier(),
         )
 
-        piece_with_true = MessagePiece(
-            role="assistant",
-            original_value="Simulated success response",
-            original_value_data_type="text",
-            conversation_id=str(uuid.uuid4()),
-            scores=[true_score],
-        )
-
-        piece_with_false = MessagePiece(
-            role="assistant",
-            original_value="Simulated refusal response",
-            original_value_data_type="text",
-            conversation_id=str(uuid.uuid4()),
-            scores=[false_score],
-        )
+        manager._memory.add_scores_to_memory(scores=[true_score, false_score])
 
         # Test with true score only - should get no scores
         context.prepended_conversation = [
@@ -1012,7 +1017,7 @@ class TestInitializeContext:
         state = await manager.initialize_context_async(
             context=context,
             target=mock_chat_target,
-            conversation_id=conversation_id,
+            conversation_id=str(uuid.uuid4()),
             max_turns=10,
         )
 
@@ -1034,8 +1039,9 @@ class TestInitializeContext:
         )
 
         assert len(state2.last_assistant_message_scores) == 1
-        assert false_score in state2.last_assistant_message_scores
-        assert context2.last_score == false_score
+        assert state2.last_assistant_message_scores[0].id == false_score.id
+        assert context2.last_score is not None
+        assert context2.last_score.id == false_score.id
 
 
 # =============================================================================
@@ -1196,7 +1202,7 @@ class TestPrependedConversationConfigSettings:
     ) -> None:
         """Test that converters are applied to all roles by default."""
         mock_normalizer = MagicMock(spec=PromptNormalizer)
-        mock_normalizer.convert_values = AsyncMock()
+        mock_normalizer.convert_values_async = AsyncMock()
         manager = ConversationManager(attack_identifier=attack_identifier, prompt_normalizer=mock_normalizer)
         conversation_id = str(uuid.uuid4())
         context = _TestAttackContext(params=AttackParameters(objective="Test objective"))
@@ -1211,8 +1217,8 @@ class TestPrependedConversationConfigSettings:
             request_converters=converter_config,
         )
 
-        # convert_values should be called for each message (both user and assistant)
-        assert mock_normalizer.convert_values.call_count == 2
+        # convert_values_async should be called for each message (both user and assistant)
+        assert mock_normalizer.convert_values_async.call_count == 2
 
     async def test_apply_converters_to_roles_user_only(
         self,
@@ -1222,7 +1228,7 @@ class TestPrependedConversationConfigSettings:
     ) -> None:
         """Test that converters are applied only to user role when configured."""
         mock_normalizer = MagicMock(spec=PromptNormalizer)
-        mock_normalizer.convert_values = AsyncMock()
+        mock_normalizer.convert_values_async = AsyncMock()
         manager = ConversationManager(attack_identifier=attack_identifier, prompt_normalizer=mock_normalizer)
         conversation_id = str(uuid.uuid4())
         context = _TestAttackContext(params=AttackParameters(objective="Test objective"))
@@ -1239,8 +1245,8 @@ class TestPrependedConversationConfigSettings:
             prepended_conversation_config=config,
         )
 
-        # convert_values should be called only for user message
-        assert mock_normalizer.convert_values.call_count == 1
+        # convert_values_async should be called only for user message
+        assert mock_normalizer.convert_values_async.call_count == 1
 
     async def test_apply_converters_to_roles_assistant_only(
         self,
@@ -1250,7 +1256,7 @@ class TestPrependedConversationConfigSettings:
     ) -> None:
         """Test that converters are applied only to assistant role when configured."""
         mock_normalizer = MagicMock(spec=PromptNormalizer)
-        mock_normalizer.convert_values = AsyncMock()
+        mock_normalizer.convert_values_async = AsyncMock()
         manager = ConversationManager(attack_identifier=attack_identifier, prompt_normalizer=mock_normalizer)
         conversation_id = str(uuid.uuid4())
         context = _TestAttackContext(params=AttackParameters(objective="Test objective"))
@@ -1267,8 +1273,8 @@ class TestPrependedConversationConfigSettings:
             prepended_conversation_config=config,
         )
 
-        # convert_values should be called only for assistant message
-        assert mock_normalizer.convert_values.call_count == 1
+        # convert_values_async should be called only for assistant message
+        assert mock_normalizer.convert_values_async.call_count == 1
 
     async def test_apply_converters_to_roles_empty_list_skips_all(
         self,
@@ -1278,7 +1284,7 @@ class TestPrependedConversationConfigSettings:
     ) -> None:
         """Test that empty roles list means no converters applied to any role."""
         mock_normalizer = MagicMock(spec=PromptNormalizer)
-        mock_normalizer.convert_values = AsyncMock()
+        mock_normalizer.convert_values_async = AsyncMock()
         manager = ConversationManager(attack_identifier=attack_identifier, prompt_normalizer=mock_normalizer)
         conversation_id = str(uuid.uuid4())
         context = _TestAttackContext(params=AttackParameters(objective="Test objective"))
@@ -1295,8 +1301,8 @@ class TestPrependedConversationConfigSettings:
             prepended_conversation_config=config,
         )
 
-        # convert_values should not be called since no roles are configured
-        mock_normalizer.convert_values.assert_not_called()
+        # convert_values_async should not be called since no roles are configured
+        mock_normalizer.convert_values_async.assert_not_called()
 
     # -------------------------------------------------------------------------
     # message_normalizer Tests
@@ -1651,8 +1657,8 @@ class TestAddPrependedConversationToMemory:
             request_converters=converter_config,
         )
 
-        # Verify convert_values was called
-        mock_prompt_normalizer.convert_values.assert_called()
+        # Verify convert_values_async was called
+        mock_prompt_normalizer.convert_values_async.assert_called()
 
     async def test_handles_none_messages_gracefully(
         self,

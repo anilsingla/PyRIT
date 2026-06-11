@@ -3,13 +3,12 @@
 
 import abc
 import logging
-from typing import Any, Union, final
+from typing import Any, final
 
 from pyrit.common.deprecation import print_deprecation_message
-from pyrit.identifiers import ComponentIdentifier, Identifiable
 from pyrit.memory import CentralMemory, MemoryInterface
-from pyrit.models import Message, MessagePiece
-from pyrit.models.json_response_config import _JsonResponseConfig
+from pyrit.models import ComponentIdentifier, Identifiable, Message, MessagePiece
+from pyrit.prompt_target.common.json_response_config import _JsonResponseConfig
 from pyrit.prompt_target.common.target_capabilities import CapabilityName, TargetCapabilities
 from pyrit.prompt_target.common.target_configuration import TargetConfiguration
 
@@ -43,6 +42,28 @@ class PromptTarget(Identifiable):
     # constructor parameter, which takes precedence over the class-level value.
     _DEFAULT_CONFIGURATION: TargetConfiguration = TargetConfiguration(capabilities=TargetCapabilities())
 
+    def __init_subclass__(cls, **kwargs: object) -> None:
+        """
+        Validate that subclasses follow the keyword-only ``__init__`` contract.
+
+        Args:
+            **kwargs: Additional keyword arguments passed to the superclass.
+
+        Raises:
+            TypeError: If the subclass ``__init__`` accepts positional parameters
+                after ``self`` and is not grandfathered via ``_brick_legacy_init``.
+        """
+        super().__init_subclass__(**kwargs)
+        # Local import to avoid a circular dependency at package init time.
+        from pyrit.common.brick_contract import enforce_keyword_only_init
+
+        enforce_keyword_only_init(cls, base_name="PromptTarget")
+
+    # TODO: ``PromptTarget.__init__`` itself accepts positional parameters, which
+    # violates the keyword-only contract enforced by ``__init_subclass__`` on
+    # subclasses. The hook only runs for subclasses, so the base class non-
+    # compliance is tolerated during the warn-first phase. Reshape this
+    # signature (insert ``*`` after ``self``) in 0.16.0 as a BREAKING CHANGE.
     def __init__(
         self,
         verbose: bool = False,
@@ -94,11 +115,11 @@ class PromptTarget(Identifiable):
         1. Validates the message, fetches the conversation from memory, appends ``message``, and runs
            the normalization pipeline (system‑squash, history‑squash, etc.).
         2. Validates the normalized conversation against the target's capabilities.
-        3. Delegates to :meth:`_send_prompt_to_target_async` with the normalized
+        3. Delegates to ``_send_prompt_to_target_async`` with the normalized
            conversation.
 
         Subclasses MUST NOT override this method. Override
-        :meth:`_send_prompt_to_target_async` instead.
+        ``_send_prompt_to_target_async`` instead.
 
         Args:
             message (Message): The message to send.
@@ -121,7 +142,7 @@ class PromptTarget(Identifiable):
         """
         Target-specific send logic.
 
-        Called by :meth:`send_prompt_async` after validation and normalization.
+        Called by ``send_prompt_async`` after validation and normalization.
 
         Args:
             normalized_conversation (list[Message]): The full conversation
@@ -229,13 +250,26 @@ class PromptTarget(Identifiable):
         metadata so that the response built from the normalized message stays part of the
         correct conversation and retains traceability.
 
+        ``prompt_metadata`` is handled by provenance so that metadata-editing normalizers
+        are honored. A piece that shares the source piece's ``id`` is the same logical piece
+        (possibly a copy whose metadata a normalizer intentionally edited or stripped, e.g.
+        ``JsonSchemaNormalizer``) — its metadata is kept as-is. A piece with a different
+        ``id`` is brand-new (e.g. a squashed message), so the source's request metadata is
+        restored, with any keys the normalizer set on the new piece taking precedence.
+
         Args:
             source: The original (pre-normalization) message whose metadata is authoritative.
             target_message: The normalized message whose pieces will be updated in place.
         """
         source_piece = source.message_pieces[0]
         for piece in target_message.message_pieces:
-            piece.copy_lineage_from(source_piece)
+            normalized_metadata = dict(piece.prompt_metadata)
+            is_new_piece = piece.id != source_piece.id
+            piece.copy_lineage_from(source=source_piece)
+            if is_new_piece:
+                piece.prompt_metadata = {**dict(source_piece.prompt_metadata), **normalized_metadata}
+            else:
+                piece.prompt_metadata = normalized_metadata
 
     def set_model_name(self, *, model_name: str) -> None:
         """
@@ -263,7 +297,7 @@ class PromptTarget(Identifiable):
 
         If the target does not natively support system prompts, whether this
         call is ultimately honored depends on the target's
-        :class:`CapabilityHandlingPolicy`:
+        ``CapabilityHandlingPolicy``:
 
         * ``ADAPT`` — the normalization pipeline (e.g. system squash) will
           fold the system message into user content on the wire.
@@ -306,7 +340,7 @@ class PromptTarget(Identifiable):
                 converted_value=system_prompt,
                 prompt_target_identifier=self.get_identifier(),
                 attack_identifier=attack_identifier,
-                labels=labels,
+                labels=labels or {},
             ).to_message()
         )
 
@@ -320,7 +354,7 @@ class PromptTarget(Identifiable):
         self,
         *,
         params: dict[str, Any] | None = None,
-        children: dict[str, Union[ComponentIdentifier, list[ComponentIdentifier]]] | None = None,
+        children: dict[str, ComponentIdentifier | list[ComponentIdentifier]] | None = None,
     ) -> ComponentIdentifier:
         """
         Construct the target identifier.
@@ -335,7 +369,7 @@ class PromptTarget(Identifiable):
         Args:
             params (dict[str, Any] | None): Additional behavioral parameters from
                 the subclass (e.g., temperature, top_p). Merged into the base params.
-            children (dict[str, Union[ComponentIdentifier, list[ComponentIdentifier]]] | None):
+            children (dict[str, ComponentIdentifier | list[ComponentIdentifier]] | None):
                 Named child component identifiers.
 
         Returns:
@@ -388,7 +422,7 @@ class PromptTarget(Identifiable):
 
         Policy is preserved because it expresses user intent (ADAPT vs RAISE),
         independent of what the probe found. To change policy or normalizer
-        overrides, build a new :class:`TargetConfiguration` and pass it via
+        overrides, build a new ``TargetConfiguration`` and pass it via
         ``custom_configuration`` at construction time instead.
 
         Note:

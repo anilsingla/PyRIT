@@ -12,10 +12,9 @@ from pyrit.common.utils import combine_dict
 from pyrit.executor.attack.component.prepended_conversation_config import (
     PrependedConversationConfig,
 )
-from pyrit.identifiers import ComponentIdentifier
 from pyrit.memory import CentralMemory
 from pyrit.message_normalizer import ConversationContextNormalizer
-from pyrit.models import ChatMessageRole, Message, MessagePiece, Score
+from pyrit.models import ChatMessageRole, ComponentIdentifier, Message, MessagePiece, Score
 from pyrit.prompt_normalizer.prompt_converter_configuration import (
     PromptConverterConfiguration,
 )
@@ -40,14 +39,14 @@ def mark_messages_as_simulated(messages: Sequence[Message]) -> list[Message]:
         messages (Sequence[Message]): The messages to mark as simulated.
 
     Returns:
-        List[Message]: The same messages with assistant roles converted to simulated_assistant.
+        list[Message]: The same messages with assistant roles converted to simulated_assistant.
             Modifies the messages in place and also returns them for convenience.
     """
     result = list(messages)
     for message in result:
         for piece in message.message_pieces:
-            if piece._role == "assistant":
-                piece._role = "simulated_assistant"
+            if piece.role == "assistant":
+                piece.role = "simulated_assistant"
     return result
 
 
@@ -57,7 +56,7 @@ def get_adversarial_chat_messages(
     adversarial_chat_conversation_id: str,
     attack_identifier: ComponentIdentifier,
     adversarial_chat_target_identifier: ComponentIdentifier,
-    labels: Optional[dict[str, str]] = None,  # deprecated
+    labels: dict[str, str] | None = None,  # deprecated
 ) -> list[Message]:
     """
     Transform prepended conversation messages for adversarial chat with swapped roles.
@@ -117,7 +116,7 @@ def get_adversarial_chat_messages(
                 conversation_id=adversarial_chat_conversation_id,
                 attack_identifier=attack_identifier,
                 prompt_target_identifier=adversarial_chat_target_identifier,
-                labels=labels,  # deprecated
+                labels=labels or {},  # deprecated
             )
 
             result.append(adversarial_piece.to_message())
@@ -147,7 +146,7 @@ async def build_conversation_context_string_async(messages: list[Message]) -> st
     return await normalizer.normalize_string_async(messages)
 
 
-def get_prepended_turn_count(prepended_conversation: Optional[list[Message]]) -> int:
+def get_prepended_turn_count(prepended_conversation: list[Message] | None) -> int:
     """
     Count the number of turns (assistant responses) in a prepended conversation.
 
@@ -192,7 +191,7 @@ class ConversationManager:
         self,
         *,
         attack_identifier: ComponentIdentifier,
-        prompt_normalizer: Optional[PromptNormalizer] = None,
+        prompt_normalizer: PromptNormalizer | None = None,
     ) -> None:
         """
         Initialize the conversation manager.
@@ -220,9 +219,7 @@ class ConversationManager:
         conversation = self._memory.get_conversation(conversation_id=conversation_id)
         return list(conversation)
 
-    def get_last_message(
-        self, *, conversation_id: str, role: Optional[ChatMessageRole] = None
-    ) -> Optional[MessagePiece]:
+    def get_last_message(self, *, conversation_id: str, role: ChatMessageRole | None = None) -> MessagePiece | None:
         """
         Retrieve the most recent message from a conversation.
 
@@ -252,7 +249,7 @@ class ConversationManager:
         target: PromptTarget,
         conversation_id: str,
         system_prompt: str,
-        labels: Optional[dict[str, str]] = None,  # deprecated
+        labels: dict[str, str] | None = None,  # deprecated
     ) -> None:
         """
         Set or update the system prompt for a conversation.
@@ -289,10 +286,10 @@ class ConversationManager:
         context: "AttackContext[Any]",
         target: PromptTarget,
         conversation_id: str,
-        request_converters: Optional[list[PromptConverterConfiguration]] = None,
+        request_converters: list[PromptConverterConfiguration] | None = None,
         prepended_conversation_config: Optional["PrependedConversationConfig"] = None,
-        max_turns: Optional[int] = None,
-        memory_labels: Optional[dict[str, str]] = None,
+        max_turns: int | None = None,
+        memory_labels: dict[str, str] | None = None,
     ) -> ConversationState:
         """
         Initialize attack context with prepended conversation and merged labels.
@@ -439,9 +436,9 @@ class ConversationManager:
         *,
         prepended_conversation: list[Message],
         conversation_id: str,
-        request_converters: Optional[list[PromptConverterConfiguration]] = None,
+        request_converters: list[PromptConverterConfiguration] | None = None,
         prepended_conversation_config: Optional["PrependedConversationConfig"] = None,
-        max_turns: Optional[int] = None,
+        max_turns: int | None = None,
     ) -> int:
         """
         Add prepended conversation messages to memory for a chat target.
@@ -482,7 +479,7 @@ class ConversationManager:
         turn_count = 0
 
         for i, message in enumerate(valid_messages):
-            message_copy = message.duplicate_message()
+            message_copy = message.duplicate()
 
             message_copy.set_simulated_role()
 
@@ -520,9 +517,9 @@ class ConversationManager:
         context: "AttackContext[Any]",
         prepended_conversation: list[Message],
         conversation_id: str,
-        request_converters: Optional[list[PromptConverterConfiguration]],
+        request_converters: list[PromptConverterConfiguration] | None,
         prepended_conversation_config: Optional["PrependedConversationConfig"],
-        max_turns: Optional[int],
+        max_turns: int | None,
     ) -> ConversationState:
         """
         Process prepended conversation for a chat target.
@@ -569,17 +566,22 @@ class ConversationManager:
             if hasattr(context, "executed_turns"):
                 context.executed_turns = state.turn_count  # type: ignore[ty:invalid-assignment]
 
-            # Extract scores on final prepended assistant message if it exists and are relavent
-            # Multi-part messages (e.g., text + image) may have scores on multiple pieces
-            # only extract true_false scores with score_value=False. This allows attacks
-            # to use the score's rationale for feedback without re-scoring.
-            for piece in final_prepended_message.message_pieces:
-                for score in piece.scores:
-                    if score.score_type == "true_false" and score.get_value() is False:
-                        state.last_assistant_message_scores.append(score)
-                        # context.last_score gets the first matching score for single-score use cases.
-                        if hasattr(context, "last_score") and context.last_score is None:
-                            context.last_score = score  # type: ignore[ty:invalid-assignment]
+            # Extract scores on final prepended assistant message if it exists and are relevant.
+            # The prepended pieces were re-keyed with new ids when added to memory, so look
+            # them up by conversation_id and filter to the last assistant turn. Only extract
+            # true_false scores with score_value=False so attacks can use the rationale for
+            # feedback without re-scoring.
+            memory_pieces = self._memory.get_message_pieces(conversation_id=conversation_id)
+            assistant_piece_ids = [str(piece.id) for piece in memory_pieces if piece.api_role == "assistant"]
+            existing_scores = (
+                self._memory.get_prompt_scores(prompt_ids=assistant_piece_ids) if assistant_piece_ids else []
+            )
+            for score in existing_scores:
+                if score.score_type == "true_false" and score.get_value() is False:
+                    state.last_assistant_message_scores.append(score)
+                    # context.last_score gets the first matching score for single-score use cases.
+                    if hasattr(context, "last_score") and context.last_score is None:
+                        context.last_score = score  # type: ignore[ty:invalid-assignment]
 
         return state
 
@@ -588,7 +590,7 @@ class ConversationManager:
         *,
         message: Message,
         request_converters: list[PromptConverterConfiguration],
-        apply_to_roles: Optional[list[ChatMessageRole]],
+        apply_to_roles: list[ChatMessageRole] | None,
     ) -> None:
         """
         Apply converters to message pieces.
@@ -605,7 +607,7 @@ class ConversationManager:
                 continue
 
             temp_message = Message(message_pieces=[piece])
-            await self._prompt_normalizer.convert_values(
+            await self._prompt_normalizer.convert_values_async(
                 message=temp_message,
                 converter_configurations=request_converters,
             )

@@ -4,7 +4,9 @@
 import logging
 import uuid
 from enum import Enum
-from typing import Literal, Optional
+from typing import Literal
+
+from typing_extensions import override
 
 from pyrit.datasets.seed_datasets.remote._image_cache import (
     fetch_and_cache_image_async,
@@ -12,7 +14,7 @@ from pyrit.datasets.seed_datasets.remote._image_cache import (
 from pyrit.datasets.seed_datasets.remote.remote_dataset_loader import (
     _RemoteDatasetLoader,
 )
-from pyrit.models import SeedDataset, SeedPrompt
+from pyrit.models import Modality, SeedDataset, SeedPrompt, SeedUnion
 
 logger = logging.getLogger(__name__)
 
@@ -73,8 +75,8 @@ class _VisualLeakBenchDataset(_RemoteDatasetLoader):
     )
 
     tags: frozenset[str] = frozenset({"default", "safety", "privacy"})
-    size: str = "large"
-    modalities: tuple[str, ...] = ("image", "text")
+    size: str = "large"  # 2000 image-text PII / OCR-injection prompts
+    modalities: tuple[Modality, ...] = (Modality.IMAGE, Modality.TEXT)
     harm_categories: tuple[str, ...] = ("privacy", "pii_leakage", "ocr_injection")
 
     def __init__(
@@ -82,9 +84,8 @@ class _VisualLeakBenchDataset(_RemoteDatasetLoader):
         *,
         source: str = METADATA_URL,
         source_type: Literal["public_url", "file"] = "public_url",
-        categories: Optional[list[VisualLeakBenchCategory]] = None,
-        pii_types: Optional[list[VisualLeakBenchPIIType]] = None,
-        max_examples: Optional[int] = None,
+        categories: list[VisualLeakBenchCategory] | None = None,
+        pii_types: list[VisualLeakBenchPIIType] | None = None,
     ) -> None:
         """
         Initialize the VisualLeakBench dataset loader.
@@ -98,9 +99,6 @@ class _VisualLeakBenchDataset(_RemoteDatasetLoader):
                 VisualLeakBenchCategory.PII_LEAKAGE.
             pii_types: List of PII types to include (only relevant for PII_LEAKAGE category).
                 If None, all PII types are included.
-            max_examples: Maximum number of examples to fetch. Each example produces 2 prompts
-                (image + text). If None, fetches all examples. Useful for testing or quick
-                validations.
 
         Raises:
             ValueError: If any of the specified categories or pii_types are invalid.
@@ -109,7 +107,6 @@ class _VisualLeakBenchDataset(_RemoteDatasetLoader):
         self.source_type: Literal["public_url", "file"] = source_type
         self.categories = categories
         self.pii_types = pii_types
-        self.max_examples = max_examples
 
         if categories is not None:
             self._validate_enums(categories, VisualLeakBenchCategory, "category")
@@ -118,10 +115,12 @@ class _VisualLeakBenchDataset(_RemoteDatasetLoader):
             self._validate_enums(pii_types, VisualLeakBenchPIIType, "PII type")
 
     @property
+    @override
     def dataset_name(self) -> str:
         """Return the dataset name."""
         return "visual_leak_bench"
 
+    @override
     async def fetch_dataset_async(self, *, cache: bool = True) -> SeedDataset:
         """
         Fetch VisualLeakBench examples and return as SeedDataset.
@@ -148,7 +147,7 @@ class _VisualLeakBenchDataset(_RemoteDatasetLoader):
             cache=cache,
         )
 
-        prompts: list[SeedPrompt] = []
+        prompts: list[SeedUnion] = []
         failed_image_count = 0
 
         for example in examples:
@@ -169,9 +168,6 @@ class _VisualLeakBenchDataset(_RemoteDatasetLoader):
                 continue
 
             prompts.extend(pair)
-
-            if self.max_examples is not None and len(prompts) >= self.max_examples * 2:
-                break
 
         if failed_image_count > 0:
             logger.warning(f"[VisualLeakBench] Skipped {failed_image_count} image(s) due to fetch failures")
@@ -218,6 +214,12 @@ class _VisualLeakBenchDataset(_RemoteDatasetLoader):
             Exception: If the image cannot be fetched.
         """
         authors = ["Youting Wang", "Yuan Tang", "Yitian Qian", "Chen Zhao"]
+        groups = [
+            "Northeastern University",
+            "Carnegie Mellon University",
+            "Boston University",
+            "New York University",
+        ]
         description = (
             "VisualLeakBench is a benchmark for evaluating Large Vision-Language Models against "
             "visual privacy attacks. It contains 1,000 adversarial images spanning OCR Injection "
@@ -247,6 +249,7 @@ class _VisualLeakBenchDataset(_RemoteDatasetLoader):
             harm_categories=harm_categories,
             description=description,
             authors=authors,
+            groups=groups,
             source=self.PAPER_URL,
             prompt_group_id=group_id,
             sequence=0,
@@ -266,6 +269,7 @@ class _VisualLeakBenchDataset(_RemoteDatasetLoader):
             harm_categories=harm_categories,
             description=description,
             authors=authors,
+            groups=groups,
             source=self.PAPER_URL,
             prompt_group_id=group_id,
             sequence=0,

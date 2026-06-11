@@ -3,7 +3,7 @@
 
 import logging
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Optional
+from typing import TYPE_CHECKING, Any
 
 from pyrit.common import Parameter, apply_defaults
 from pyrit.common.deprecation import print_deprecation_message  # Deprecated. Will be removed in 0.16.0.
@@ -96,39 +96,9 @@ class Scam(Scenario):
         return [SCORER_SEED_PROMPT_PATH / "true_false_question" / "scams.yaml"]
 
     @classmethod
-    def get_strategy_class(cls) -> type[ScenarioStrategy]:
-        """
-        Get the strategy enum class for this scenario.
-
-        Returns:
-            Type[ScenarioStrategy]: The ScamStrategy enum class.
-        """
-        return ScamStrategy
-
-    @classmethod
-    def get_default_strategy(cls) -> ScenarioStrategy:
-        """
-        Get the default strategy used when no strategies are specified.
-
-        Returns:
-            ScenarioStrategy: ScamStrategy.ALL (all scam strategies).
-        """
-        return ScamStrategy.ALL
-
-    @classmethod
     def required_datasets(cls) -> list[str]:
         """Return a list of dataset names required by this scenario."""
         return ["airt_scams"]
-
-    @classmethod
-    def default_dataset_config(cls) -> DatasetConfiguration:
-        """
-        Return the default dataset configuration for this scenario.
-
-        Returns:
-            DatasetConfiguration: Configuration with airt_scams dataset.
-        """
-        return DatasetConfiguration(dataset_names=["airt_scams"], max_dataset_size=4)
 
     @classmethod
     def supported_parameters(cls) -> list[Parameter]:
@@ -151,20 +121,20 @@ class Scam(Scenario):
     def __init__(
         self,
         *,
-        objective_scorer: Optional[TrueFalseScorer] = None,
-        adversarial_chat: Optional[PromptTarget] = None,
-        scenario_result_id: Optional[str] = None,
+        objective_scorer: TrueFalseScorer | None = None,
+        adversarial_chat: PromptTarget | None = None,
+        scenario_result_id: str | None = None,
         include_baseline: bool | None = None,  # Deprecated. Will be removed in 0.16.0.
     ) -> None:
         """
         Initialize the ScamScenario.
 
         Args:
-            objective_scorer (Optional[TrueFalseScorer]): Custom scorer for objective
+            objective_scorer (TrueFalseScorer | None): Custom scorer for objective
                 evaluation.
-            adversarial_chat (Optional[PromptTarget]): Chat target used to rephrase the
+            adversarial_chat (PromptTarget | None): Chat target used to rephrase the
                 objective into the role-play context (in single-turn strategies).
-            scenario_result_id (Optional[str]): Optional ID of an existing scenario result to resume.
+            scenario_result_id (str | None): Optional ID of an existing scenario result to resume.
             include_baseline (bool | None): **Deprecated.** Will be removed in 0.16.0. Pass
                 ``include_baseline`` to ``initialize_async`` instead.
         """
@@ -179,6 +149,8 @@ class Scam(Scenario):
         super().__init__(
             version=self.VERSION,
             strategy_class=ScamStrategy,
+            default_strategy=ScamStrategy.ALL,
+            default_dataset_config=DatasetConfiguration(dataset_names=["airt_scams"], max_dataset_size=4),
             objective_scorer=objective_scorer,
             scenario_result_id=scenario_result_id,
         )
@@ -194,14 +166,14 @@ class Scam(Scenario):
             self._legacy_include_baseline = include_baseline
 
         # Will be resolved in _get_atomic_attacks_async
-        self._seed_groups: Optional[list[SeedAttackGroup]] = None
+        self._seed_groups: list[SeedAttackGroup] | None = None
 
     def _resolve_seed_groups(self) -> list[SeedAttackGroup]:
         """
         Resolve seed groups from dataset configuration.
 
         Returns:
-            List[SeedAttackGroup]: List of seed attack groups with objectives to be tested.
+            list[SeedAttackGroup]: List of seed attack groups with objectives to be tested.
         """
         # Use dataset_config (guaranteed to be set by initialize_async)
         seed_groups = self._dataset_config.get_all_seed_attack_groups()
@@ -229,7 +201,7 @@ class Scam(Scenario):
             raise ValueError(
                 "Scenario not properly initialized. Call await scenario.initialize_async() before running."
             )
-        attack_strategy: Optional[AttackStrategy[Any, Any]] = None
+        attack_strategy: AttackStrategy[Any, Any] | None = None
 
         if strategy == "persuasive_rta":
             # Set system prompt to generic persuasion persona
@@ -274,7 +246,7 @@ class Scam(Scenario):
         Generate atomic attacks for each strategy.
 
         Returns:
-            List[AtomicAttack]: List of atomic attacks to execute.
+            list[AtomicAttack]: List of atomic attacks to execute.
         """
         # Resolve seed groups from deprecated objectives or dataset config
         self._seed_groups = self._resolve_seed_groups()

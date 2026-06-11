@@ -4,7 +4,6 @@
 
 import logging
 from collections.abc import Sequence
-from typing import Optional
 
 from pyrit.common import apply_defaults
 from pyrit.common.deprecation import print_deprecation_message  # Deprecated. Will be removed in 0.16.0.
@@ -59,7 +58,7 @@ class EncodingDatasetConfiguration(DatasetConfiguration):
         - The original seed as a SeedPrompt
 
         Returns:
-            List[SeedAttackGroup]: All resolved seed attack groups with objectives.
+            list[SeedAttackGroup]: All resolved seed attack groups with objectives.
 
         Raises:
             ValueError: If no seeds could be resolved from the configuration.
@@ -134,59 +133,25 @@ class Encoding(Scenario):
 
     VERSION: int = 1
 
-    @classmethod
-    def get_strategy_class(cls) -> type[ScenarioStrategy]:
-        """
-        Get the strategy enum class for this scenario.
-
-        Returns:
-            Type[ScenarioStrategy]: The EncodingStrategy enum class.
-        """
-        return EncodingStrategy
-
-    @classmethod
-    def get_default_strategy(cls) -> ScenarioStrategy:
-        """
-        Get the default strategy used when no strategies are specified.
-
-        Returns:
-            ScenarioStrategy: EncodingStrategy.ALL (all encoding strategies).
-        """
-        return EncodingStrategy.ALL
-
-    @classmethod
-    def default_dataset_config(cls) -> DatasetConfiguration:
-        """
-        Return the default dataset configuration for this scenario.
-
-        Returns:
-            EncodingDatasetConfiguration: Configuration with garak slur terms and web XSS payloads,
-                where each seed is transformed into a SeedAttackGroup with an encoding objective.
-        """
-        return EncodingDatasetConfiguration(
-            dataset_names=["garak_slur_terms_en", "garak_web_html_js"],
-            max_dataset_size=3,
-        )
-
     @apply_defaults
     def __init__(
         self,
         *,
-        objective_scorer: Optional[TrueFalseScorer] = None,
-        encoding_templates: Optional[Sequence[str]] = None,
-        scenario_result_id: Optional[str] = None,
+        objective_scorer: TrueFalseScorer | None = None,
+        encoding_templates: Sequence[str] | None = None,
+        scenario_result_id: str | None = None,
         include_baseline: bool | None = None,  # Deprecated. Will be removed in 0.16.0.
     ) -> None:
         """
         Initialize the Encoding Scenario.
 
         Args:
-            objective_scorer (Optional[TrueFalseScorer]): The scorer used to evaluate if the model
+            objective_scorer (TrueFalseScorer | None): The scorer used to evaluate if the model
                 successfully decoded the payload. Defaults to DecodingScorer with encoding_scenario
                 category.
-            encoding_templates (Optional[Sequence[str]]): Templates used to construct the decoding
+            encoding_templates (Sequence[str] | None): Templates used to construct the decoding
                 prompts. Defaults to AskToDecodeConverter.garak_templates.
-            scenario_result_id (Optional[str]): Optional ID of an existing scenario result to resume.
+            scenario_result_id (str | None): Optional ID of an existing scenario result to resume.
             include_baseline (bool | None): **Deprecated.** Will be removed in 0.16.0. Pass
                 ``include_baseline`` to ``initialize_async`` instead.
         """
@@ -198,6 +163,11 @@ class Encoding(Scenario):
         super().__init__(
             version=self.VERSION,
             strategy_class=EncodingStrategy,
+            default_strategy=EncodingStrategy.ALL,
+            default_dataset_config=EncodingDatasetConfiguration(
+                dataset_names=["garak_slur_terms_en", "garak_web_html_js"],
+                max_dataset_size=3,
+            ),
             objective_scorer=objective_scorer,
             scenario_result_id=scenario_result_id,
         )
@@ -213,7 +183,7 @@ class Encoding(Scenario):
             self._legacy_include_baseline = include_baseline
 
         # Will be resolved in _get_atomic_attacks_async
-        self._resolved_seed_groups: Optional[list[SeedAttackGroup]] = None
+        self._resolved_seed_groups: list[SeedAttackGroup] | None = None
 
     def _resolve_seed_groups(self) -> list[SeedAttackGroup]:
         """
@@ -235,7 +205,7 @@ class Encoding(Scenario):
         Retrieve the list of AtomicAttack instances in this scenario.
 
         Returns:
-            List[AtomicAttack]: The list of AtomicAttack instances in this scenario.
+            list[AtomicAttack]: The list of AtomicAttack instances in this scenario.
         """
         # Resolve seed prompts from deprecated parameter or dataset config
         self._resolved_seed_groups = self._resolve_seed_groups()
