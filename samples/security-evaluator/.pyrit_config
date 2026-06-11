@@ -1,0 +1,21 @@
+# ═══════════════════════════════════════════════════════════════════════════════
+# PyRIT Configuration for security-evaluator
+# ═══════════════════════════════════════════════════════════════════════════════
+#
+# This is the ACTIVE configuration file for the security-evaluator workflow.
+# It configures PyRIT's core behavior and references environment variables in .env.local.
+
+memory_db_type: sqlite
+
+# This workflow runs as:
+operator: local_redteam
+operation: owasp_ollama_example
+
+# No cloud service initializers needed for local Ollama setup
+initializers: []
+
+# Load model endpoints and parameters from .env.local
+env_files:
+  - ./.env.local
+
+silent: false

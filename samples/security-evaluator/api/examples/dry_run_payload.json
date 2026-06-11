@@ -1,0 +1,9 @@
+{
+  "options": {
+    "attack_mode": "redteam",
+    "turn_mode": "single",
+    "local_datasets_only": true,
+    "converters": ["base64", "leetspeak"],
+    "scenarios": ["LLM01", "LLM02"]
+  }
+}

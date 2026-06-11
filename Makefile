@@ -1,4 +1,8 @@
+<<<<<<< HEAD
 .PHONY: all pre-commit ty unit-test unit-test-junit unit-test-cov-html unit-test-cov-xml diff-cover unit-test-diff-cover
+=======
+.PHONY: all pre-commit mypy test test-cov-html test-cov-xml setup-sqlite
+>>>>>>> ab2e05589546baf3660455b2301bc1981f71cf66
 
 CMD:=uv run -m
 PYMODULE:=pyrit
@@ -75,5 +79,10 @@ end-to-end-test:
 partner-integration-test:
 	$(CMD) pytest $(PARTNER_INTEGRATION_TESTS) -v --junitxml=junit/partner-test-results.xml
 
-#clean:
-#	git clean -Xdf # Delete all files in .gitignore
+setup-sqlite:
+	@echo "Detecting OS and running SQLite installer..."
+	@if [ "$(OS)" = "Windows_NT" ]; then \
+		powershell -ExecutionPolicy Bypass -File samples/security-evaluator/scripts/installers/setup_sqlite_windows.ps1; \
+	else \
+		bash samples/security-evaluator/scripts/installers/setup_sqlite_linux.sh; \
+	fi

@@ -1,0 +1,68 @@
+# Unified security-evaluator runtime:
+# PyRIT CLI + JupyterLab run in the same container.
+# The repo is volume-mounted so the evaluator, notebooks, configs, and reports
+# all operate on the same files.
+
+services:
+  copyrit:
+    build:
+      context: .
+      dockerfile: Dockerfile.pyrit-copyrit-quick
+    image: pyrit-copyrit-quick:latest
+    container_name: security-evaluator-copyrit
+    working_dir: /workspace
+    command: >-
+      bash -lc "jupyter lab --ip=0.0.0.0 --port=8888 --no-browser --allow-root & tail -f /dev/null"
+    ports:
+      - "8888:8888"  # JupyterLab web interface
+    volumes:
+      - ../../:/workspace  # Bind the repo into the unified runtime container
+    environment:
+      # OLLAMA model configuration
+      OLLAMA_ENDPOINT: http://host.docker.internal:11434/v1
+      OLLAMA_TARGET_MODEL: llama3.2
+      OLLAMA_ATTACKER_MODEL: mistral
+      OLLAMA_CONVERTER_MODEL: phi3
+      OLLAMA_TF_SCORER_MODEL: phi3
+      OLLAMA_SCALE_SCORER_MODEL: llama2
+      OLLAMA_REFUSAL_SCORER_MODEL: mistral
+      OLLAMA_SCORER_MODEL: phi3
+      OLLAMA_MODEL: llama2
+      ALLOW_REMOTE_OLLAMA_ENDPOINT: "false"
+
+      # Shared SQLite database path on the host mount.
+      PYRIT_SQLITE_DB_PATH: /workspace/samples/security-evaluator/reports/pyrit_ollama_demo.db
+
+      # Output and artifact paths.
+      ARTIFACTS_ROOT_PATH: /workspace/samples/security-evaluator/reports
+      LOGS_ROOT_PATH: /workspace/samples/security-evaluator/logs
+      SCORER_COMPARISON_CSV_PATH: /workspace/samples/security-evaluator/reports/scorer_comparison.csv
+      SCORER_OUTPUTS_JSON_PATH: /workspace/samples/security-evaluator/reports/scorer_outputs.json
+      BATCH_SCORER_CHECK_JSON_PATH: /workspace/samples/security-evaluator/reports/batch_scorer_check.json
+      RUN_REPORT_JSON_PATH: /workspace/samples/security-evaluator/reports/run_report.json
+      REPORTS_ROOT_PATH: /workspace/samples/security-evaluator/reports/cases
+
+      # Runtime behavior.
+      DEBUG: "false"
+      ALLOW_RUNTIME_PIP_INSTALL: "false"
+      PYRIT_MAX_TURNS: "4"
+      PRINT_DATASET_SEEDS: "false"
+      DATASET_PREVIEW_ROWS: "3"
+      EXPORT_DETAILED_SCORES_JSON: "true"
+      RUN_ALL_AVAILABLE_DATASETS: "false"
+      MAX_DATASETS_PER_SCENARIO: "0"
+      OLLAMA_MAX_RETRIES_PER_SCENARIO: "3"
+      OLLAMA_RETRY_WAIT_SECONDS: "5"
+      RESUME_INCOMPLETE_RUN: "true"
+
+      # Attack mode parameters.
+      TAP_WIDTH: "3"
+      TAP_BRANCHING_FACTOR: "2"
+      TAP_DEPTH: "5"
+      CRESCENDO_MAX_BACKTRACKS: "5"
+      CRESCENDO_MAX_TURNS: "10"
+      BASELINE_MAX_SEEDS: "0"
+      BASELINE_REPORT_PATH: /workspace/samples/security-evaluator/reports/baseline_scan_report.json
+
+    extra_hosts:
+      - "host.docker.internal:host-gateway"

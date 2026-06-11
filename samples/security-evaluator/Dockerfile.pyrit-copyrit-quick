@@ -1,0 +1,18 @@
+FROM python:3.11-slim
+
+WORKDIR /workspace
+
+# Install minimal OS packages needed for the all-in-one runtime.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends git \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install PyRIT and JupyterLab in the same container.
+RUN pip install --upgrade pip \
+    && pip install pyrit jupyterlab
+
+# Expose JupyterLab.
+EXPOSE 8888
+
+# Start JupyterLab and keep the container alive for evaluator CLI commands.
+CMD ["bash", "-c", "jupyter lab --ip=0.0.0.0 --port=8888 --no-browser --allow-root & tail -f /dev/null"]

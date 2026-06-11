@@ -1,0 +1,27 @@
+{
+  "generated_at_utc": "2026-05-19T17:47:10.647601+00:00",
+  "inputs": {
+    "scorer_json_path": "C:\\githubrepos\\Anil_github_repos\\PyRIT\\reports\\report\\datasets__harmbench\\scorers__self_ask_true_false\\20260519T174710Z\\scorer_outputs.json",
+    "cases_dir": "C:\\githubrepos\\Anil_github_repos\\PyRIT\\reports\\report\\datasets__harmbench\\scorers__self_ask_true_false\\20260519T174710Z\\cases",
+    "run_report_path": "C:\\githubrepos\\Anil_github_repos\\PyRIT\\reports\\report\\datasets__harmbench\\scorers__self_ask_true_false\\20260519T174710Z\\run_report.json"
+  },
+  "outputs": {
+    "html": "C:\\githubrepos\\Anil_github_repos\\PyRIT\\reports\\report\\datasets__harmbench\\scorers__self_ask_true_false\\20260519T174710Z\\run_report.html",
+    "markdown": null,
+    "all_selection_comparison_json": null
+  },
+  "summary": {
+    "scenario_row_count": 0,
+    "test_case_count": 0,
+    "using_all_datasets": false,
+    "using_all_scorers": false,
+    "run_report_keys": []
+  },
+  "dataset_scorer_hierarchy": {},
+  "test_case_execution_summaries": [],
+  "gui_sqlite_import_payload": {
+    "format": "pyrit_gui_sqlite_import_v1",
+    "rows": []
+  },
+  "rows": []
+}

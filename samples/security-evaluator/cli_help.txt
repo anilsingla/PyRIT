@@ -1,0 +1,113 @@
+﻿usage: main.py [-h]
+               [--attack-mode {redteam,tap,crescendo,xpia,baseline,rescore,report}]
+               [--turn-mode {single,multi}] [--converters [CONVERTERS ...]]
+               [--all-converters] [--datasets [DATASETS ...]] [--all-datasets]
+               [--scorers [SCORERS ...]] [--all-scorers]
+               [--scenarios [SCENARIOS ...]] [--dry-run]
+               [--local-datasets-only] [--converter-info] [--detailed-help]
+               [--tap-width TAP_WIDTH] [--tap-depth TAP_DEPTH]
+               [--tap-branching-factor TAP_BRANCHING_FACTOR]
+               [--max-backtracks MAX_BACKTRACKS] [--max-turns MAX_TURNS]
+               [--max-seeds MAX_SEEDS] [--filter-owasp [FILTER_OWASP ...]]
+               [--output-json OUTPUT_JSON] [--output-html OUTPUT_HTML]
+               [--output-md OUTPUT_MD] [--open]
+
+PyRIT x Ollama û OWASP LLM red-team suite for adversarial red-teaming.
+
+options:
+  -h, --help            show this help message and exit
+  --attack-mode {redteam,tap,crescendo,xpia,baseline,rescore,report}
+                        Attack strategy: 'redteam' (multi-turn adversarial,
+                        all OWASP), 'tap' (tree-of-attacks), 'crescendo'
+                        (escalating), 'xpia' (injection), 'baseline'
+                        (compliance scan). Default: baseline
+  --turn-mode {single,multi}
+                        Single-turn (max_turns=1, fast) or multi-turn
+                        conversations. Env fallback: PYRIT_ATTACK_TURN_MODE.
+                        Default: single
+  --converters [CONVERTERS ...]
+                        Converter keys for text obfuscation (space- or comma-
+                        separated). OPTIONS: base64, rot13, caesar, atbash,
+                        flip, leetspeak, unicode_confusable, string_join,
+                        char_swap, emoji, random_caps, tone_persuasive,
+                        variation, translation_french. Omit to use all
+                        stateless converters by default.
+  --all-converters      Force use of all available converters including LLM-
+                        based ones (overrides default converter selection).
+  --datasets [DATASETS ...]
+                        Dataset names or .json/.yaml/.yml/.prompt file paths.
+                        Omit to use PYRIT_DEFAULT_DATASETS when set; otherwise
+                        all available datasets.
+  --all-datasets        Force use of all available datasets (overrides default
+                        dataset selection).
+  --scorers [SCORERS ...]
+                        Scorer keys to run. Omit to use PYRIT_DEFAULT_SCORERS
+                        when set; otherwise compute all. Keys: substring,
+                        self_ask_true_false, self_ask_scale,
+                        scale_threshold_0_7, refusal,
+                        compliance_inverted_refusal.
+  --all-scorers         Force use of all available scorers (overrides default
+                        scorer selection).
+  --scenarios [SCENARIOS ...]
+                        OWASP IDs to run (e.g. LLM01 LLM02). Omit for all.
+                        (tap/crescendo/xpia/baseline only)
+  --dry-run             Print the execution plan without running any attacks.
+  --local-datasets-only
+                        Redteam mode: use only datasets already available
+                        locally/in-memory and skip remote provider fetch.
+  --converter-info      Display comprehensive converter selection guide with
+                        descriptions and use cases, then exit.
+  --detailed-help       Display comprehensive CLI help: attack modes, option
+                        categories, environment variables, examples, then
+                        exit.
+  --tap-width TAP_WIDTH
+                        TAP: number of attack branches.
+  --tap-depth TAP_DEPTH
+                        TAP: max tree depth per scenario.
+  --tap-branching-factor TAP_BRANCHING_FACTOR
+                        TAP: child nodes per branch.
+  --max-backtracks MAX_BACKTRACKS
+                        Crescendo: max backtrack count.
+  --max-turns MAX_TURNS
+                        Max conversation turns.
+  --max-seeds MAX_SEEDS
+                        Baseline: max seeds per scenario (0=unlimited).
+  --filter-owasp [FILTER_OWASP ...]
+                        Rescore: limit to OWASP IDs.
+  --output-json OUTPUT_JSON
+                        Rescore: output JSON path.
+  --output-html OUTPUT_HTML
+                        Report: output HTML path.
+  --output-md OUTPUT_MD
+                        Report: output Markdown path.
+  --open                Report: open HTML in browser after generation.
+
+EXAMPLES
+========
+
+  # Quick baseline test (default)
+  python scripts/app/main.py --dry-run --local-datasets-only
+
+  # Red-team with harmbench dataset
+  python scripts/app/main.py --attack-mode redteam --dry-run --local-datasets-only
+
+  # Single-turn attack with specific converters
+  python scripts/app/main.py --attack-mode redteam --turn-mode single \
+    --converters base64,leetspeak --dry-run
+
+  # Multi-turn attack with all converters
+  python scripts/app/main.py --attack-mode redteam --turn-mode multi \
+    --all-converters --all-datasets --all-scorers
+
+  # Display converter selection guide
+  python scripts/app/main.py --converter-info
+
+  # Display detailed help with all available options
+  python scripts/app/main.py --detailed-help
+
+FOR MORE INFORMATION
+====================
+  Use: --detailed-help    Show comprehensive option documentation
+       --converter-info    Show converter selection guide with benefits
+       --help              Show this message with supported attacks/utilities
+        
