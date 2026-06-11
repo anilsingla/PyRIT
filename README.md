@@ -10,9 +10,6 @@ identify risks in generative AI systems.
   about how to use, install, or contribute to PyRIT.
 - Visit our [Discord server](https://discord.gg/9fMpq3tc8u) to chat with the team and community.
 
-<<<<<<< HEAD
-## Trademarks and Citations
-=======
 PyRIT is a library developed by the AI Red Team for researchers and engineers
 to help them assess the robustness of their LLM endpoints against different
 harm categories such as fabrication/ungrounded content (e.g., hallucination),
@@ -148,7 +145,6 @@ silent: false
 ```
 
 ## Trademarks
->>>>>>> ab2e05589546baf3660455b2301bc1981f71cf66
 
 This project may contain trademarks or logos for projects, products, or services.
 Authorized use of Microsoft trademarks or logos is subject to and must follow
@@ -158,9 +154,6 @@ not cause confusion or imply Microsoft sponsorship.
 Any use of third-party trademarks or logos are subject to those third-party's
 policies.
 
-<<<<<<< HEAD
-If you use PyRIT in your research, please cite the tool itself following the [`CITATION.cff`](./CITATION.cff) file in the root of this repository.
-=======
 ---
 
 ## Attack Mode Flow
@@ -213,4 +206,3 @@ flowchart TD
     F --> G[JupyterLab]
     G --> H[User]
 ```
->>>>>>> ab2e05589546baf3660455b2301bc1981f71cf66
